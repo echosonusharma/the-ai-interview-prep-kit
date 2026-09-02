@@ -1,0 +1,128 @@
+@import "tailwindcss";
+@custom-variant dark (&:is(.dark *));
+
+/* — Design Tokens — Theme: PrepPilot AI (lavender soft, navy ink, violet accent) */
+:root {
+  --background: #e7e9f5;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-soft: #f6f7fb;
+  --muted: #f1f2f9;
+  --border: #e6e8f2;
+  --border-strong: #d6d9eb;
+  --nav-dark: #0b1220;
+  --accent: #5b5bf5;
+  --accent-soft: #eef0ff;
+  --accent-hover: #4f46e5;
+  --pink: #ff7eb0;
+  --orange: #ffb86a;
+  --success: #10b981;
+  --text-soft: #8a8fa8;
+  --text-faint: #a0a6c2;
+  color-scheme: light;
+}
+
+html.dark,
+.dark {
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+  --card: #1e293b;
+  --card-soft: #18233a;
+  --muted: #1e2a4a;
+  --border: #334155;
+  --border-strong: #475569;
+  --nav-dark: #f1f5f9;
+  --accent: #818cf8;
+  --accent-soft: #232a5a;
+  --text-soft: #cbd5e1;
+  --text-faint: #94a3b8;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-nav: var(--nav-dark);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
+}
+
+* { border-color: var(--border); }
+html { scrollbar-gutter: auto; }
+
+body {
+  background: #ffffff;
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+html.dark body,
+.dark body {
+  background: var(--background);
+}
+
+/* utilities */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.focus-ring:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* — Dark overrides for hardcoded Tailwind arbitrary classes — */
+/* bg — support both html.dark and scoped .dark */
+html.dark .bg-white, .dark .bg-white { background-color: var(--card) !important; }
+html.dark .bg-\[\#ffffff\], .dark .bg-\[\#ffffff\] { background-color: var(--card) !important; }
+html.dark .bg-\[\#f6f7fb\], .dark .bg-\[\#f6f7fb\] { background-color: var(--card-soft) !important; }
+html.dark .bg-\[\#f1f2f9\], .dark .bg-\[\#f1f2f9\] { background-color: var(--muted) !important; }
+html.dark .bg-\[\#e7e9f5\], .dark .bg-\[\#e7e9f5\] { background-color: var(--background) !important; }
+/* icon pastel bgs — keep tinted but visible on lighter dark cards */
+html.dark .bg-\[\#eef0ff\], .dark .bg-\[\#eef0ff\] { background-color: #2a335e !important; }
+html.dark .bg-\[\#e6fffa\], .dark .bg-\[\#e6fffa\] { background-color: #15302e !important; }
+html.dark .bg-\[\#fef3c7\], .dark .bg-\[\#fef3c7\] { background-color: #2e2a1a !important; }
+html.dark .bg-\[\#fce7f3\], .dark .bg-\[\#fce7f3\] { background-color: #2a1e2e !important; }
+html.dark .bg-\[\#e0e7ff\], .dark .bg-\[\#e0e7ff\] { background-color: #232a5a !important; }
+html.dark .bg-\[\#f1f5f9\], .dark .bg-\[\#f1f5f9\] { background-color: #1e2a44 !important; }
+
+/* primary button / dark surfaces -> invert for contrast, except auth panels marked keep-dark */
+html.dark .bg-\[\#0b1220\]:not(.auth-keep-dark), .dark .bg-\[\#0b1220\]:not(.auth-keep-dark) { background-color: #f1f5f9 !important; color: #0f172a !important; }
+html.dark .bg-\[\#0b1220\]:not(.auth-keep-dark).text-white, .dark .bg-\[\#0b1220\]:not(.auth-keep-dark).text-white,
+html.dark .bg-\[\#0b1220\]:not(.auth-keep-dark) .text-white, .dark .bg-\[\#0b1220\]:not(.auth-keep-dark) .text-white { color: #0f172a !important; }
+html.dark .auth-keep-dark, .dark .auth-keep-dark { background-color: #0b1220 !important; }
+html.dark .auth-keep-dark .text-white, .dark .auth-keep-dark .text-white { color: #ffffff !important; }
+html.dark .from-\[\#0b1220\], .dark .from-\[\#0b1220\] { --tw-gradient-from: #0b1220 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+html.dark .to-\[\#0b1220\], .dark .to-\[\#0b1220\] { --tw-gradient-to: #0b1220 !important; }
+
+/* borders */
+html.dark .border-\[\#e6e8f2\], .dark .border-\[\#e6e8f2\] { border-color: var(--border) !important; }
+html.dark .border-\[\#d6d9eb\], .dark .border-\[\#d6d9eb\] { border-color: var(--border-strong) !important; }
+html.dark .border-white, .dark .border-white { border-color: var(--border) !important; }
+
+/* text — brighter for lighter dark */
+html.dark .text-\[\#0b1220\], .dark .text-\[\#0b1220\] { color: #f1f5f9 !important; }
+html.dark .text-\[\#0f172a\], .dark .text-\[\#0f172a\] { color: #f1f5f9 !important; }
+html.dark .text-\[\#1f2937\], .dark .text-\[\#1f2937\] { color: #f1f5f9 !important; }
+html.dark .text-\[\#67708f\], .dark .text-\[\#67708f\] { color: #cbd5e1 !important; }
+html.dark .text-\[\#8a8fa8\], .dark .text-\[\#8a8fa8\] { color: #94a3b8 !important; }
+html.dark .text-\[\#a0a6c2\], .dark .text-\[\#a0a6c2\] { color: #94a3b8 !important; }
+
+/* subtle hover bg */
+html.dark .hover\:bg-\[\#f6f7fb\]:hover, .dark .hover\:bg-\[\#f6f7fb\]:hover { background-color: var(--muted) !important; }
+html.dark .hover\:bg-white:hover, .dark .hover\:bg-white:hover { background-color: var(--muted) !important; }
+
+/* keep accent readable */
+html.dark .text-\[\#5b5bf5\], .dark .text-\[\#5b5bf5\] { color: #8b8bff !important; }
+html.dark .bg-\[\#5b5bf5\], .dark .bg-\[\#5b5bf5\] { background-color: #5b5bf5 !important; }
+html.dark .text-white, .dark .text-white { color: #e6e8f2; }
+html.dark .text-white\/70, .dark .text-white\/70 { color: rgba(226,232,240,0.7) !important; }
