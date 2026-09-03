@@ -8,6 +8,7 @@ const schema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   FRONTEND_URL: z.string().url().optional(),
   MONGODB_URI: z.string().min(1).default("mongodb://localhost:27017/preppilot"),
+  SESSION_SECRET: z.string().min(16).default("dev-secret-change-in-production"),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -22,5 +23,6 @@ export const env = {
   NODE_ENV: parsed.data.NODE_ENV,
   FRONTEND_URL: parsed.data.FRONTEND_URL,
   MONGODB_URI: parsed.data.MONGODB_URI,
+  SESSION_SECRET: parsed.data.SESSION_SECRET,
   isProd: parsed.data.NODE_ENV === "production",
 };
