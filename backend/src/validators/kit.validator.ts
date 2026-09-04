@@ -2,6 +2,16 @@ import { z } from "zod";
 
 // Zod validators for Kit
 
+// Permissive URL check: anything the URL constructor parses, localhost included.
+const urlSchema = z.string().refine((v) => {
+  try {
+    new URL(v);
+    return true;
+  } catch {
+    return false;
+  }
+}, "must be a valid URL");
+
 // Primitives
 const requirementSchema = z.object({
   id: z.string().min(1),
@@ -22,23 +32,23 @@ const questionSchema = z.object({
   id: z.string().min(1),
   requirement_ids: z.array(z.string().min(1)),
   category: z.enum(["technical", "behavioural", "system-design", "company-fit"]),
-  prompt: z.string().min(1),
-  answer_outline: z.string().min(1),
+  prompt: z.string().trim().min(1),
+  answer_outline: z.string().trim().min(1),
   difficulty: z.union([z.literal(1), z.literal(2), z.literal(3)]),
   _state: questionStateSchema,
 });
 
 const flashcardSchema = z.object({
   id: z.string().min(1),
-  front: z.string().min(1),
-  back: z.string().min(1),
+  front: z.string().trim().min(1),
+  back: z.string().trim().min(1),
   requirement_ids: z.array(z.string().min(1)),
   _state: questionStateSchema,
 });
 
 const scheduleDaySchema = z.object({
   day: z.number().int().min(1),
-  focus: z.string().min(1),
+  focus: z.string().trim().min(1),
   question_ids: z.array(z.string().min(1)),
   minutes: z.number().int().min(1).max(8 * 60),
 });
@@ -51,13 +61,13 @@ export const kitAppendixSchema = z.object({
     role: z.string(),
     location: z.string(),
     jd_chars: z.number().int().min(0),
-    researched_at: z.string(),
-    pages_used: z.array(z.string()),
+    researched_at: z.string().datetime(),
+    pages_used: z.array(urlSchema),
   }),
   company_brief: z.object({
-    summary: z.string(),
+    summary: z.string().trim().min(1),
     what_they_do: z.string(),
-    sources: z.array(z.string()),
+    sources: z.array(urlSchema),
   }),
   role: z.object({
     title: z.string(),
@@ -79,13 +89,23 @@ export const kitAppendixSchema = z.object({
 
 export type KitAppendix = z.infer<typeof kitAppendixSchema>;
 
+const requirementStateSchema = z
+  .object({
+    origin: z.enum(["generated", "edited", "user"]),
+    pinned: z.boolean(),
+    editedAt: z.coerce.date().optional(),
+  })
+  .optional();
+
 // Full document (DB shape) — includes extensions + cross-field invariants
+// Requirements carry an edit-origin marker in the DB; the pure appendix
+// schema above stays exact for batch output.
 export const kitDocumentSchema = z
   .object({
     owner: z.any(), // ObjectId — validated by Mongoose, not Zod
     input: z.object({
       rawJd: z.string().min(1),
-      companyUrl: z.string(),
+      companyUrl: urlSchema,
       days: z.number().int().min(1).max(60),
       jdHash: z.string().min(1),
       batchCaseId: z.string().optional(),
@@ -94,10 +114,12 @@ export const kitDocumentSchema = z
     company_brief: z.object({
       summary: z.string(),
       what_they_do: z.string(),
-      sources: z.array(z.string()),
+      sources: z.array(urlSchema),
       _meta: z.object({ pinned: z.boolean(), editedAt: z.coerce.date().optional() }).optional(),
     }),
-    role: kitAppendixSchema.shape.role,
+    role: kitAppendixSchema.shape.role.extend({
+      requirements: z.array(requirementSchema.extend({ _state: requirementStateSchema })),
+    }),
     questions: z.array(questionSchema),
     flashcards: z.array(flashcardSchema),
     schedule: z.object({
@@ -163,23 +185,40 @@ export const kitDocumentSchema = z
       }
     }
 
-    // schedule invariants
-    if (kit.schedule.days.length !== kit.schedule.days_available) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["schedule", "days"],
-        message: `schedule days_available=${kit.schedule.days_available} must equal days.length=${kit.schedule.days.length}`,
-      });
-    }
-    const qSet = new Set(qIds);
-    for (const d of kit.schedule.days) {
-      for (const qid of d.question_ids) {
-        if (!qSet.has(qid)) {
-          ctx.addIssue({ code: "custom", path: ["schedule", "days"], message: `schedule day ${d.day} refs unknown question ${qid}` });
+    // schedule invariants — only enforce when generation finished
+    if (kit.job.status === "done") {
+      if (kit.schedule.days.length !== kit.schedule.days_available) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["schedule", "days"],
+          message: `schedule days_available=${kit.schedule.days_available} must equal days.length=${kit.schedule.days.length}`,
+        });
+      }
+      const dayNums = kit.schedule.days.map((d) => d.day);
+      if (new Set(dayNums).size !== dayNums.length) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["schedule", "days"],
+          message: "schedule day numbers must be unique",
+        });
+      } else if (!dayNums.every((n, i) => n === i + 1)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["schedule", "days"],
+          message: "schedule days must be numbered 1..N contiguous and sorted",
+        });
+      }
+      const qSet = new Set(qIds);
+      for (const d of kit.schedule.days) {
+        for (const qid of d.question_ids) {
+          if (!qSet.has(qid)) {
+            ctx.addIssue({ code: "custom", path: ["schedule", "days"], message: `schedule day ${d.day} refs unknown question ${qid}` });
+          }
         }
       }
     }
-    // every must requirement scheduled (only when done — draft can be partial mid-generation)
+
+    // every must requirement scheduled (only when done)
     if (kit.job.status === "done") {
       const scheduledQIds = new Set(kit.schedule.days.flatMap((d) => d.question_ids));
       const scheduledReqIds = new Set(kit.questions.filter((q) => scheduledQIds.has(q.id)).flatMap((q) => q.requirement_ids));
@@ -195,6 +234,11 @@ export const kitDocumentSchema = z
       if (!reqSet.has(rid)) {
         ctx.addIssue({ code: "custom", path: ["coverage", "uncovered_requirement_ids"], message: `coverage uncovered ${rid} unknown` });
       }
+    }
+
+    // finished kits must carry a real brief — in-progress docs are created blank
+    if (kit.job.status === "done" && !kit.company_brief.summary.trim()) {
+      ctx.addIssue({ code: "custom", path: ["company_brief", "summary"], message: "company_brief.summary must not be blank" });
     }
   });
 

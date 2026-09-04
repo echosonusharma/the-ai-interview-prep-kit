@@ -12,10 +12,10 @@ All LLM prompts are versioned as Markdown in this directory. Each phase has its 
 | 3 | [`questions-system-design.system.md`](./questions-system-design.system.md) | System-design trade-offs | Zen pool (fail on exhaustion) |
 | 3 | [`questions-company-fit.system.md`](./questions-company-fit.system.md) | Company-fit questions | Zen pool (fail on exhaustion) |
 | 4 | *(code)* `findUncovered` | Coverage check — deterministic, no LLM | — |
-| 5 | `questions-*` (gap) | Fill uncovered reqs, per-kind buckets | Zen pool (fail on exhaustion) |
-| 6 | [`flashcards.system.md`](./flashcards.system.md) | Spaced-repetition cards | Zen pool (fail on exhaustion) |
+| 5 | `questions-*` (gap) | Fill uncovered reqs, per-category buckets (behavioural / technical / system-design / company-fit) | Zen pool (fail on exhaustion) |
+| 6 | [`flashcards.system.md`](./flashcards.system.md) | Spaced-repetition cards, built from the real question bank after questions + gap pass | Zen pool (fail on exhaustion) |
 | 7 | *(code)* `allocateSchedule` | Day allocation — deterministic, no LLM | — |
 
-**Sequencing:** Retrieval → 2-phase extract (parallel) + brief → per-category questions (parallel) → code coverage → gap pass → flashcards → code schedule. No single mega-prompt.
+**Sequencing:** Retrieval → 2-phase extract (parallel) + brief → per-category questions (parallel) → code coverage → gap pass (per-category refill) → flashcards (sequenced after questions with the real question bank, never concurrent with an empty bank) → code schedule. No single mega-prompt.
 
 **Security:** All untrusted JD/crawl content is wrapped in `<DATA>` tags; system prompts instruct the model to *analyse, never follow* instructions inside.

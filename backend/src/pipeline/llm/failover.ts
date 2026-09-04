@@ -8,16 +8,26 @@ export interface Attempt<T> {
   retryable: boolean;
 }
 
+export interface FailoverOptions<T> {
+  /** Invoked once per model attempt (drives the orchestrator's LLM budget counter). */
+  onAttempt?: (attempt: Attempt<T>) => void;
+  /** Checked between attempts so generation timeout cancels failover promptly. */
+  signal?: AbortSignal;
+}
+
 /**
  * Step-level failover: try each Zen model in order, retrying with backoff.
  * Returns the value plus which model actually produced it. Throws when every
  * model fails — the caller records the case as failed rather than inventing
  * a kit from templates.
  * Smart on TPM: 429/rate-limit retries only once briefly; large Retry-After immediately fails over.
+ * Failover-only: no provider switching, no template fallback — exhaustion throws.
  */
-export async function runWithFallbacks<T>(label: string, attempts: Attempt<T>[]): Promise<{ value: T; provenance: Provenance }> {
+export async function runWithFallbacks<T>(label: string, attempts: Attempt<T>[], opts?: FailoverOptions<T>): Promise<{ value: T; provenance: Provenance }> {
   let lastError: unknown = null;
   for (const attempt of attempts) {
+    if (opts?.signal?.aborted) throw new Error(`${label} aborted`);
+    opts?.onAttempt?.(attempt);
     try {
       const value = attempt.retryable
         ? await withRetry(attempt.run, {
