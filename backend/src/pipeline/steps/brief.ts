@@ -14,6 +14,25 @@ export type Brief = z.infer<typeof briefSchema>;
 
 const UNKNOWN = "Unknown from available sources.";
 
+/**
+ * Neutralize `</TAG>` collisions so untrusted text can't break out of
+ * `<DATA>...</DATA>` / `<PAGE>...</PAGE>` prompt framing. The zero-width
+ * space keeps the text human-readable while breaking exact closing-tag matches.
+ * (Duplicated per step file — steps never import from each other.)
+ */
+function escapeUntrusted(text: string): string {
+  return text.replace(/<\//g, "<\u200b/");
+}
+
+/** Sanitized model-output excerpt for error messages: max 120 chars, no newlines/angle brackets. */
+function briefErrorExcerpt(text: string): string {
+  return text
+    .replace(/[\r\n<>]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+}
+
 const REASONING_OPENERS =
   /^(okay[,!]?|first[,!]?|let me|the user (provided|requires|wants)|i need to|i'll start|rules:|now,?\s*looking)/i;
 
@@ -79,7 +98,7 @@ function parseLabeledBrief(cleaned: string): Brief | null {
 export function parseBriefText(text: string): Brief {
   const cleaned = text.trim();
   if (looksLikeBriefReasoning(cleaned)) {
-    throw new Error(`No parseable brief in model response (reasoning-only). Raw output:\n${cleaned.slice(0, 400)}`);
+    throw new Error(`brief:reasoning-only — no parseable brief in model response. Excerpt: "${briefErrorExcerpt(cleaned)}"`);
   }
 
   const labeled = parseLabeledBrief(cleaned);
@@ -103,7 +122,7 @@ export function parseBriefText(text: string): Brief {
   if (hasBriefLabels(cleaned)) {
     const salvaged = parseLabeledBrief(cleaned);
     if (salvaged) return salvaged;
-    throw new Error(`No parseable brief in model response (incomplete labels). Raw output:\n${cleaned.slice(0, 400)}`);
+    throw new Error(`brief:incomplete-labels — no parseable brief in model response. Excerpt: "${briefErrorExcerpt(cleaned)}"`);
   }
 
   // SUMMARY without WHAT_THEY_DO label (truncated mid-response)
@@ -112,7 +131,7 @@ export function parseBriefText(text: string): Brief {
     if (salvaged) return salvaged;
   }
 
-  throw new Error(`No parseable brief in model response. Raw output:\n${cleaned.slice(0, 400)}`);
+  throw new Error(`brief:unparseable — no parseable brief in model response. Excerpt: "${briefErrorExcerpt(cleaned)}"`);
 }
 
 export interface ResearchInput {
@@ -148,7 +167,7 @@ export function briefPrompt(input: ResearchInput): { system: string; user: strin
     .slice(0, 4)
     .map((p, i) => {
       const cleaned = cleanPageForPrompt(p.text || "");
-      return `<PAGE ${i + 1} url="${p.url}">\n${truncateAtSentence(cleaned, 1200)}\n</PAGE>`;
+      return `<PAGE ${i + 1} url="${escapeUntrusted(p.url)}">\n${escapeUntrusted(truncateAtSentence(cleaned, 1200))}\n</PAGE>`;
     })
     .join("\n");
 
@@ -156,14 +175,14 @@ export function briefPrompt(input: ResearchInput): { system: string; user: strin
   const snippetOnly = input.discussion.filter((d) => !d.text?.trim());
   const publicPages = withBody
     .slice(0, 3)
-    .map((d, i) => `<PAGE ${i + 1} url="${d.url}">\n${truncateAtSentence(cleanPageForPrompt(d.text!), 900)}\n</PAGE>`)
+    .map((d, i) => `<PAGE ${i + 1} url="${escapeUntrusted(d.url)}">\n${escapeUntrusted(truncateAtSentence(cleanPageForPrompt(d.text!), 900))}\n</PAGE>`)
     .join("\n");
   const interviewReports = [...snippetOnly, ...withBody]
     .slice(0, 6)
-    .map((d) => `- ${d.title} (${d.url}): ${d.snippet.slice(0, 220)}`)
+    .map((d) => `- ${escapeUntrusted(d.title)} (${escapeUntrusted(d.url)}): ${escapeUntrusted(d.snippet.slice(0, 220))}`)
     .join("\n");
   const hiringCleaned = input.hiringNotes
-    .map((n) => truncateAtSentence(n.replace(/\s+/g, " ").trim(), 300))
+    .map((n) => escapeUntrusted(truncateAtSentence(n.replace(/\s+/g, " ").trim(), 300)))
     .slice(0, 3)
     .join("\n");
 

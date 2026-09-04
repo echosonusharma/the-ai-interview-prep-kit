@@ -27,10 +27,20 @@ export type Extraction = z.infer<typeof extractionSchema>;
 export type Meta = z.infer<typeof metaSchema>;
 export type RequirementsOnly = z.infer<typeof requirementsSchema>;
 
+/**
+ * Neutralize `</TAG>` collisions so untrusted text can't break out of
+ * `<DATA>...</DATA>` prompt framing. The zero-width space keeps the text
+ * human-readable while breaking exact closing-tag matches.
+ * (Duplicated per step file — steps never import from each other.)
+ */
+function escapeUntrusted(text: string): string {
+  return text.replace(/<\//g, "<\u200b/");
+}
+
 export function extractMetaPrompt(jd: string): { system: string; user: string } {
-  return { system: PROMPTS.extractMeta, user: `<DATA jd>\n${jd.slice(0, 6000)}\n</DATA>` };
+  return { system: PROMPTS.extractMeta, user: `<DATA jd>\n${escapeUntrusted(jd.slice(0, 6000))}\n</DATA>` };
 }
 
 export function extractRequirementsPrompt(jd: string): { system: string; user: string } {
-  return { system: PROMPTS.extractReqs, user: `<DATA jd>\n${jd.slice(0, 6000)}\n</DATA>` };
+  return { system: PROMPTS.extractReqs, user: `<DATA jd>\n${escapeUntrusted(jd.slice(0, 6000))}\n</DATA>` };
 }
