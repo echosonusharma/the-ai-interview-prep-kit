@@ -1,11 +1,13 @@
 import app from "./app.js";
 import { env } from "./config/env.js";
 import { connectDB, disconnectDB } from "./config/db.js";
+import { startKitWorker } from "./modules/kit/kit.queue.js";
 
 async function start() {
   // Fail-fast on invalid env already handled in env.ts; now connect MongoDB
   try {
     await connectDB();
+    startKitWorker();
   } catch (err) {
     console.error("Failed to connect to MongoDB:", err);
     // In production, crash so orchestrator restarts; in dev/test allow running without DB if desired

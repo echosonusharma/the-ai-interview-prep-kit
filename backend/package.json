@@ -12,7 +12,8 @@
     "test:crawler": "tsx test/crawler-comprehensive.ts",
     "evaluate": "tsx src/scripts/evaluate.ts",
     "test:pipeline": "tsx test/pipeline-core.ts",
-    "test:pipeline:e2e": "tsx test/pipeline-e2e.ts"
+    "test:pipeline:e2e": "tsx test/pipeline-e2e.ts",
+    "test:kit": "tsx test/kit-progress.ts"
   },
   "keywords": [],
   "author": "",
