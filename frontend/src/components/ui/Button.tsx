@@ -3,12 +3,11 @@ import * as React from "react";
 type Variant = "primary" | "secondary" | "ghost" | "gradient";
 type Size = "sm" | "md" | "lg";
 
-export function Button({
-  variant = "primary",
-  size = "md",
-  className = "",
-  ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size }) {
+export function buttonStyles(
+  variant: Variant = "primary",
+  size: Size = "md",
+  className = ""
+): string {
   const base =
     "inline-flex items-center justify-center gap-2 font-semibold tracking-tight rounded-full transition-colors focus-ring disabled:opacity-50 disabled:pointer-events-none";
   const sizes = {
@@ -23,5 +22,15 @@ export function Button({
     gradient:
       "bg-gradient-to-br from-[#ff7eb0] via-[#ff8fa0] to-[#ffcc6a] text-white shadow-sm hover:opacity-90",
   };
-  return <button className={`${base} ${sizes[size]} ${variants[variant]} ${className}`} {...props} />;
+  return `${base} ${sizes[size]} ${variants[variant]} ${className}`;
+}
+
+export function Button({
+  variant = "primary",
+  size = "md",
+  type = "button",
+  className = "",
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size }) {
+  return <button type={type} className={buttonStyles(variant, size, className)} {...props} />;
 }
