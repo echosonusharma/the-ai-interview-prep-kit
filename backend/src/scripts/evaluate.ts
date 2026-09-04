@@ -52,10 +52,18 @@ function colorStep(step: string): string {
 
 async function main() {
   const args = process.argv.slice(2);
-  const inputPath = args[args.indexOf("--input") + 1];
-  const outputPath = args[args.indexOf("--output") + 1];
+  const argValue = (flag: string): string | undefined => {
+    const i = args.indexOf(flag);
+    if (i < 0) return undefined;
+    const value = args[i + 1];
+    return value && !value.startsWith("--") ? value : undefined;
+  };
+  const inputPath = argValue("--input");
+  const outputPath = argValue("--output");
   if (!inputPath || !outputPath) {
     console.error(s.fail("Usage: npm run evaluate -- --input <cases.json> --output <kits.json>"));
+    if (!inputPath) console.error(s.fail("Missing required flag: --input <cases.json>"));
+    if (!outputPath) console.error(s.fail("Missing required flag: --output <kits.json>"));
     process.exit(1);
   }
 

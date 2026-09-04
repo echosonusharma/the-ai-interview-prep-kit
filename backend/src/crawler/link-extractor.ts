@@ -3,6 +3,9 @@ import { normalizeUrl, sameOrigin, isAllowedByPatterns } from "./url-validator.j
 import type { ScoredLink, CrawlerConfig } from "./types.js";
 import { HIRING_KEYWORDS, EXCLUDE_PATTERNS } from "./types.js";
 
+// Unscored links kept per page when nothing scores (keeps odd hiring pages reachable).
+const FALLBACK_UNSCRED_LIMIT = 5;
+
 function scoreLink(
   href: string,
   anchorText: string,
@@ -33,6 +36,7 @@ export function extractLinks(
 ): ScoredLink[] {
   const $ = cheerio.load(html);
   const links: ScoredLink[] = [];
+  const fallback: ScoredLink[] = [];
   const seen = new Set<string>();
 
   $("a[href]").each((_, el) => {
@@ -54,11 +58,16 @@ export function extractLinks(
 
     if (score > 0 || absolute === baseUrl) {
       links.push({ url: absolute, score, anchorText, context, keywords });
+    } else if (fallback.length < FALLBACK_UNSCRED_LIMIT) {
+      fallback.push({ url: absolute, score, anchorText, context, keywords });
     }
   });
 
-  links.sort((a, b) => b.score - a.score);
-  return links;
+  // Unusually-worded hiring pages may score nothing — keep a few unscored
+  // same-origin links so they stay reachable instead of dropping the page.
+  const kept = links.length > 0 ? links : fallback;
+  kept.sort((a, b) => b.score - a.score);
+  return kept;
 }
 
 export function getTopLinks(links: ScoredLink[], max: number): ScoredLink[] {

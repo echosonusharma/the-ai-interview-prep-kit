@@ -72,7 +72,9 @@ export async function crawlCompanySite(
     }
 
     if (result.status === "success" && result.content && item.depth < config.maxDepth) {
-      const links = extractLinks(result.content, normalizedBase, config);
+      // Resolve relative links against the containing page, not the homepage —
+      // deeper pages live under different paths.
+      const links = extractLinks(result.content, item.url, config);
       const topLinks = getTopLinks(links, Math.max(1, config.maxPages - results.length));
 
       for (const link of topLinks) {

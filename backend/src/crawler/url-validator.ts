@@ -16,6 +16,47 @@ const PRIVATE_IP_RANGES = [
 
 const BLOCKED_HOSTS = ["localhost", "localhost.localdomain", "0.0.0.0", "::1", "[::1]"];
 
+export function isPrivateIp(ip: string): boolean {
+  return PRIVATE_IP_RANGES.some((r) => r.test(ip.trim()));
+}
+
+// Parse obfuscated IPv4 forms into a dotted quad: hex/octal/decimal parts
+// (0x7f.0.0.1, 0177.0.0.1), short forms (127.1), single dword (2130706433).
+// Returns null when the host is not a numeric IPv4 form.
+function parseNumericIPv4(host: string): string | null {
+  if (!/^[0-9a-fx.]+$/i.test(host)) return null;
+  const parts = host.split(".");
+  if (parts.length < 1 || parts.length > 4) return null;
+  const nums: number[] = [];
+  for (const p of parts) {
+    if (!p) return null;
+    let n: number;
+    if (/^0x[0-9a-f]+$/i.test(p)) n = parseInt(p, 16);
+    else if (/^0[0-9]+$/.test(p)) n = parseInt(p, 8);
+    else if (/^[0-9]+$/.test(p)) n = parseInt(p, 10);
+    else return null;
+    if (!Number.isSafeInteger(n) || n < 0) return null;
+    nums.push(n);
+  }
+  if (nums.length === 1) {
+    const v = nums[0];
+    if (v > 0xffffffff) return null;
+    return [(v >>> 24) & 255, (v >>> 16) & 255, (v >>> 8) & 255, v & 255].join(".");
+  }
+  // Short forms: leading parts are single octets, the last spans the rest.
+  for (let i = 0; i < nums.length - 1; i++) {
+    if (nums[i] > 255) return null;
+  }
+  const tailBytes = 4 - (nums.length - 1);
+  const last = nums[nums.length - 1];
+  if (last >= Math.pow(256, tailBytes)) return null;
+  const bytes = nums.slice(0, -1);
+  for (let i = tailBytes - 1; i >= 0; i--) {
+    bytes.push(Math.floor(last / Math.pow(256, i)) % 256);
+  }
+  return bytes.join(".");
+}
+
 export function validateUrl(url: string, config: CrawlerConfig): { valid: boolean; error?: string } {
   let parsed: URL;
   try {
@@ -32,7 +73,9 @@ export function validateUrl(url: string, config: CrawlerConfig): { valid: boolea
     return { valid: false, error: "HTTP not allowed in production" };
   }
 
-  const hostname = parsed.hostname.toLowerCase();
+  const rawHostname = parsed.hostname.toLowerCase();
+  // Strip a trailing dot ("localhost.") — same host, different string.
+  const hostname = rawHostname.endsWith(".") ? rawHostname.slice(0, -1) : rawHostname;
   // Loopback/private addresses are blocked in production only — the batch
   // grader serves company sites from localhost (§9), so dev/test allow them.
   if (config.isProd) {
@@ -40,8 +83,11 @@ export function validateUrl(url: string, config: CrawlerConfig): { valid: boolea
       return { valid: false, error: "Blocked hostname" };
     }
 
-    const ip = hostname.match(/^(\d{1,3}\.){3}\d{1,3}$/) ? hostname : null;
-    if (ip && PRIVATE_IP_RANGES.some((r) => r.test(ip))) {
+    // WHATWG URL already normalizes most obfuscated forms (0x7f.0.0.1,
+    // 2130706433, 127.1 → 127.0.0.1); parseNumericIPv4 covers the rest.
+    const dotted = parseNumericIPv4(hostname);
+    const ip = dotted ?? (hostname.match(/^(\d{1,3}\.){3}\d{1,3}$/) ? hostname : null);
+    if (ip && isPrivateIp(ip)) {
       return { valid: false, error: "Private IP addresses not allowed" };
     }
   }
