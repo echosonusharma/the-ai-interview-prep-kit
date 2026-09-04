@@ -15,10 +15,13 @@ Crawls company websites to discover hiring-related pages and extract clean conte
 ## Usage
 
 ```typescript
-import { crawlCompanySite, searchPublicDiscussion } from "./crawler/index.js";
+import { crawlCompanySite, enrichPublicDiscussion } from "./crawler/index.js";
+import { kitCrawlerConfig } from "./crawler/types.js";
 
-const crawl = await crawlCompanySite("https://company.com", { maxPages: 10 });
-const discussion = await searchPublicDiscussion("Company Name", "https://company.com");
+const cfg = kitCrawlerConfig(process.env.NODE_ENV === "production");
+const crawl = await crawlCompanySite("https://company.com", cfg);
+const discussion = await enrichPublicDiscussion("Company Name", "https://company.com", cfg);
+// discussion.warnings — non-fatal search/fetch issues
 ```
 
 ## Configuration
@@ -44,6 +47,8 @@ interface CrawlerConfig {
 - Blocks private IPs (10.x, 172.16-31.x, 192.168.x, 127.x, link-local)
 - Blocks localhost, 0.0.0.0
 - Enforces HTTPS in production
+- Re-validates redirect targets in production (blocks SSRF via `redirect: follow`)
+- Public discussion fetches use the same `isProd` rules as site crawl
 - Validates content-type (HTML only)
 - Enforces 2MB content limit
 

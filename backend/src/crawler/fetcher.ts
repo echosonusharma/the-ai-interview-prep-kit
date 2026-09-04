@@ -24,24 +24,25 @@ function getHostLimiter(host: string, config: CrawlerConfig): HostLimiter {
 }
 
 async function waitForToken(host: string, config: CrawlerConfig): Promise<void> {
-  const limiter = getHostLimiter(host, config);
-  const now = Date.now();
+  for (;;) {
+    const limiter = getHostLimiter(host, config);
+    const now = Date.now();
 
-  const elapsed = now - limiter.lastRefill;
-  const refillTokens = Math.floor(elapsed / limiter.delayMs) * config.rateLimitPerHost;
-  if (refillTokens > 0) {
-    limiter.tokens = Math.min(config.rateLimitPerHost, limiter.tokens + refillTokens);
-    limiter.lastRefill = now;
+    const elapsed = now - limiter.lastRefill;
+    const refillTokens = Math.floor(elapsed / limiter.delayMs) * config.rateLimitPerHost;
+    if (refillTokens > 0) {
+      limiter.tokens = Math.min(config.rateLimitPerHost, limiter.tokens + refillTokens);
+      limiter.lastRefill = now;
+    }
+
+    if (limiter.tokens >= 1) {
+      limiter.tokens -= 1;
+      return;
+    }
+
+    const waitMs = Math.max(0, limiter.delayMs - elapsed);
+    await new Promise((r) => setTimeout(r, waitMs));
   }
-
-  if (limiter.tokens >= 1) {
-    limiter.tokens -= 1;
-    return;
-  }
-
-  const waitMs = limiter.delayMs - elapsed;
-  await new Promise((r) => setTimeout(r, Math.max(0, waitMs)));
-  return waitForToken(host, config);
 }
 
 function updateLimiterDelay(host: string, crawlDelay?: number, config?: CrawlerConfig): void {
@@ -121,6 +122,18 @@ export async function fetchPage(
       error: e instanceof Error ? e.message : "Fetch failed",
       fetchedAt: new Date().toISOString(),
     };
+  }
+
+  if (res.url && res.url !== url) {
+    const redirectCheck = validateUrl(res.url, config);
+    if (!redirectCheck.valid) {
+      return {
+        url,
+        status: "error",
+        error: `Redirect blocked (${res.url}): ${redirectCheck.error}`,
+        fetchedAt: new Date().toISOString(),
+      };
+    }
   }
 
   const contentType = res.headers.get("content-type") || "";

@@ -38,11 +38,19 @@ export interface RobotsInfo {
   sitemaps?: string[];
 }
 
+export interface DiscussionHit {
+  url: string;
+  title: string;
+  snippet: string;
+  text?: string;
+}
+
 export interface CrawlerOutput {
   pages: CrawlResult[];
   baseUrl: string;
   crawledAt: string;
   robotsInfo?: RobotsInfo;
+  warnings?: string[];
 }
 
 export interface SearchResult {
@@ -63,8 +71,18 @@ export const DEFAULT_CONFIG: CrawlerConfig = {
   minDelayMs: 1000,
   maxRetries: 3,
   backoffBaseMs: 1000,
-  isProd: process.env.NODE_ENV === "production",
+  // Evaluated lazily via env.isProd where used; default false so tests/local work.
+  isProd: false,
 };
+
+export function getDefaultConfig(): CrawlerConfig {
+  return { ...DEFAULT_CONFIG, isProd: process.env.NODE_ENV === "production" };
+}
+
+/** Shared crawl/search settings for kit generation. */
+export function kitCrawlerConfig(isProd: boolean): Partial<CrawlerConfig> {
+  return { maxPages: 6, maxDepth: 2, isProd };
+}
 
 export const HIRING_KEYWORDS = [
   { keyword: "careers", weight: 10 },

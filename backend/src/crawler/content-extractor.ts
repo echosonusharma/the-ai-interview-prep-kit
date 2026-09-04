@@ -8,6 +8,13 @@ const REMOVE_SELECTORS = [
   "footer",
   "nav",
   "aside",
+  "svg",
+  "picture",
+  "video",
+  "audio",
+  "canvas",
+  "iframe",
+  "form",
   ".nav",
   ".navbar",
   ".header",
@@ -20,13 +27,32 @@ const REMOVE_SELECTORS = [
   ".consent",
   ".popup",
   ".modal",
+  ".overlay",
   ".ad",
   ".ads",
   ".advertisement",
+  ".alert",
+  ".notification",
+  ".banner",
+  ".announcement",
+  ".top-bar",
+  ".toast",
+  ".promo",
+  ".share",
+  ".social",
+  ".social-share",
+  ".widget",
+  ".newsletter",
+  ".subscribe",
+  "[class*='cookie']",
+  "[class*='consent']",
+  "[id*='cookie']",
+  "[id*='consent']",
   "[role=banner]",
   "[role=navigation]",
   "[role=complementary]",
   "[role=contentinfo]",
+  "[aria-hidden='true']",
 ];
 
 const CONTENT_SELECTORS = [
@@ -59,13 +85,17 @@ export function extractContent(html: string, url: string): { title: string; text
     contentEl = $("body");
   }
 
+  contentEl.find("br, hr").replaceWith(" ");
+  contentEl.find("p,div,h1,h2,h3,h4,h5,h6,li,section,article,tr,td,th,blockquote,pre,ul,ol,table,thead,tbody,tfoot,header,footer,nav,button,a,span,label").each((_, el) => {
+    $(el).after(" ");
+  });
+
   const title = $("title").first().text().trim() || $("h1").first().text().trim() || "";
 
-  const text = contentEl
-    .text()
-    .replace(/\s+/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  let text = contentEl.text().replace(/\s+/g, " ").trim();
+  text = text.replace(/Your browser does not support the video tag\.?/gi, " ");
+  text = text.replace(/\s+/g, " ").trim();
+  if (text.length > 8000) text = text.slice(0, 8000).trim();
 
   return { title, text };
 }
