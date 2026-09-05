@@ -3,7 +3,6 @@ import { User } from "../../models/user.model.js";
 import { env } from "../../config/env.js";
 
 const MIN_PASSWORD_LEN = 8;
-// bcrypt only uses the first 72 bytes; longer input would be silently truncated.
 const MAX_PASSWORD_LEN = 72;
 
 function normalizeEmail(email: string): string {

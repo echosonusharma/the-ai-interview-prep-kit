@@ -20,7 +20,7 @@ interface TestResult {
 }
 
 const TEST_COMPANIES: TestCompany[] = [
-  { name: "Trao", url: "https://trao.ai/", category: "Assessment" },
+  { name: "Trao", url: "https://trao.ai/", category: "Tech" },
   { name: "GitHub", url: "https://github.com", category: "Major tech" },
   { name: "GitLab", url: "https://about.gitlab.com", category: "Major tech" },
   { name: "PostHog", url: "https://posthog.com", category: "Major tech" },

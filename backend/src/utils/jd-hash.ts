@@ -1,10 +1,5 @@
 import { createHash } from "node:crypto";
 
-/**
- * Normalize a company URL so trivial variants (case, trailing slash, utm_*
- * tracking params, param order) hash identically and don't bypass dedupe.
- * Only the host is lowercased — paths stay case-sensitive.
- */
 export function normalizeCompanyUrl(rawUrl: string): string {
   const trimmed = rawUrl.trim();
   try {

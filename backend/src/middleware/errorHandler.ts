@@ -6,7 +6,6 @@ type AppError = Error & { statusCode?: number; status?: number };
 export function errorHandler(err: AppError, _req: Request, res: Response, _next: NextFunction) {
   logger.error(err.stack ?? err.message ?? String(err));
 
-  // Never leak driver/ORM internals to clients — map known shapes to clean codes.
   const name = err.name ?? "";
   const code = (err as { code?: unknown }).code;
   if (name === "ValidationError") {

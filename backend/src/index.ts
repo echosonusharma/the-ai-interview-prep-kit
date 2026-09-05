@@ -4,6 +4,16 @@ import { logger } from "./utils/logger.js";
 import { connectDB, disconnectDB } from "./config/db.js";
 import { startKitWorker } from "./modules/kit/kit.queue.js";
 
+process.on("unhandledRejection", (reason) => {
+  logger.error("Unhandled promise rejection:", reason);
+  if (env.isProd) process.exit(1);
+});
+
+process.on("uncaughtException", (err) => {
+  logger.error("Uncaught exception:", err);
+  process.exit(1);
+});
+
 async function start() {
   // Fail-fast on invalid env already handled in env.ts; now connect MongoDB
   try {

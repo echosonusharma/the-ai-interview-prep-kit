@@ -1,10 +1,5 @@
 import type { IKitQuestion, IKitRequirement } from "../types/kit.types.js";
 
-/**
- * Code-computed coverage (brief §3 — the model's opinion is not trusted here).
- * A requirement is covered when at least one question references its id.
- * Returns uncovered ids in requirement order (deterministic).
- */
 export function findUncovered(
   requirements: Pick<IKitRequirement, "id">[],
   questions: Pick<IKitQuestion, "id" | "requirement_ids">[]

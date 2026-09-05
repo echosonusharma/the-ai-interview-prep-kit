@@ -18,10 +18,17 @@ export function useKitEvents(kitId: string | null, enabled: boolean) {
   const [failed, setFailed] = useState(false);
   const esRef = useRef<EventSource | null>(null);
 
-  useEffect(() => {
+  const [prevKitId, setPrevKitId] = useState(kitId);
+  const [prevEnabled, setPrevEnabled] = useState(enabled);
+  if (kitId !== prevKitId || enabled !== prevEnabled) {
+    setPrevKitId(kitId);
+    setPrevEnabled(enabled);
     setEvent(null);
     setDone(false);
     setFailed(false);
+  }
+
+  useEffect(() => {
     if (!kitId || !enabled) return;
 
     const es = new EventSource(api.kitEventsUrl(kitId), { withCredentials: true });

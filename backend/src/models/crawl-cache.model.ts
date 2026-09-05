@@ -1,8 +1,6 @@
 import mongoose, { Schema, Model } from "mongoose";
 import { env } from "../config/env.js";
 import type { CrawlerOutput } from "../crawler/types.js";
-
-/** One cached company-site crawl, keyed by root domain (e.g. "xyz.com"). */
 export interface ICrawlCache {
   key: string;
   baseUrl: string;
@@ -20,11 +18,6 @@ const crawlCacheSchema = new Schema<ICrawlCache>(
   { timestamps: true, collection: "crawl_cache" }
 );
 
-// NOTE: the expiry is baked into the Mongo index when it is first created.
-// Changing CRAWL_CACHE_TTL_HOURS later requires dropping the old
-// `crawledAt_1` index so it is rebuilt; reads additionally check age
-// manually (see src/crawler/cache.ts), so a stale index can only delay
-// cleanup, never serve stale rows.
 crawlCacheSchema.index(
   { crawledAt: 1 },
   { expireAfterSeconds: Math.round(env.CRAWL_CACHE_TTL_HOURS * 3600) }
