@@ -59,7 +59,7 @@ export function DashboardHero({
   const active = stats?.preparing ?? kits.filter((k) => k.status === "queued" || k.status === "running").length;
   const upcomingCount = stats?.upcoming ?? upcoming.length;
   const prepDaysLeft =
-    stats?.prepDaysLeft ?? upcoming.reduce((s, k) => s + Math.max(daysLeft(k) ?? 0, 0), 0);
+    stats?.prepDaysLeft ?? upcoming.reduce((m, k) => Math.max(m, daysLeft(k) ?? 0), 0);
 
   return (
     <section className="relative w-full overflow-hidden border-b border-[#e6e8f2] bg-white">

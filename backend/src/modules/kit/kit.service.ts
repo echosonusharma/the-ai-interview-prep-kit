@@ -345,13 +345,13 @@ export async function getDashboardSummary(
       {
         $facet: {
           total: [{ $count: "n" }],
-          prepDays: [{ $group: { _id: null, sum: { $sum: "$daysLeft" } } }],
+          prepDays: [{ $group: { _id: null, max: { $max: "$daysLeft" } } }],
         },
       },
-    ]) as Promise<Array<{ total: Array<{ n: number }>; prepDays: Array<{ sum: number }> }>>,
+    ]) as Promise<Array<{ total: Array<{ n: number }>; prepDays: Array<{ max: number }> }>>,
   ]);
   const upcomingTotal = counts[0]?.total[0]?.n ?? 0;
-  const prepDaysLeft = counts[0]?.prepDays[0]?.sum ?? 0;
+  const prepDaysLeft = counts[0]?.prepDays[0]?.max ?? 0;
 
   const totalPages = Math.max(Math.ceil(upcomingTotal / limit), 1);
   const safePage = Math.min(Math.max(page, 1), totalPages);

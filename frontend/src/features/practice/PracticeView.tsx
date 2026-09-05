@@ -18,7 +18,7 @@ export default function PracticeView() {
     setLoading(true);
     setError(null);
     try {
-      const r = await api.listKits();
+      const r = await api.listKits({ sort: "upcoming" });
       setKits(r.kits.filter((k) => k.status === "done"));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load kits");

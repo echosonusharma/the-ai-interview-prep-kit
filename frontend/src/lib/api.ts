@@ -11,15 +11,32 @@ export class ApiError extends Error {
   }
 }
 
+const REQUEST_TIMEOUT_MS = 30000;
+
+// Aborts hung requests so callers never spin forever (e.g. cold backend).
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  init?.signal?.addEventListener("abort", () => controller.abort(), { once: true });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...init,
+      signal: controller.signal,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+    });
+  } catch (err) {
+    if (controller.signal.aborted && !init?.signal?.aborted) {
+      throw new ApiError("Request timed out. The server is taking too long — try again.", 408);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
   const body =
     res.status === 204 ? {} : await res.json().catch(() => ({}));
   if (!res.ok) {
