@@ -1,9 +1,12 @@
 import express from "express";
 import cors from "cors";
-import helmet from "helmet";
+import helmetDefault from "helmet";
+import type { RequestHandler } from "express";
+// helmet's dual-package default breaks some resolvers; normalize type here.
+const helmet = helmetDefault as unknown as () => RequestHandler;
 import morgan from "morgan";
 import session from "express-session";
-import MongoStore from "connect-mongo";
+import { MongoStore } from "connect-mongo";
 import healthRouter from "./modules/health/health.routes.js";
 import authRouter from "./modules/auth/auth.routes.js";
 import kitRouter from "./modules/kit/kit.routes.js";
