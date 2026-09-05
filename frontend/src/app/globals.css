@@ -59,7 +59,7 @@ html.dark,
 html { scrollbar-gutter: auto; }
 
 body {
-  background: #ffffff;
+  background: #f6f7fb;
   color: var(--foreground);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -78,6 +78,134 @@ html.dark body,
 .focus-ring:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* — Dashboard hero animations — */
+@keyframes dashboard-float-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-12px, 16px) scale(1.08); }
+}
+@keyframes dashboard-float-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(18px, -10px) scale(1.06); }
+}
+@keyframes dashboard-float-c {
+  0%, 100% { transform: translate(0, 0); opacity: 0.6; }
+  50% { transform: translate(-8px, -12px); opacity: 1; }
+}
+@keyframes name-shimmer {
+  0% { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes wave {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(14deg); }
+  75% { transform: rotate(-8deg); }
+}
+
+.dashboard-orb-a { animation: dashboard-float-a 14s ease-in-out infinite; }
+.dashboard-orb-b { animation: dashboard-float-b 18s ease-in-out infinite; }
+.dashboard-orb-c { animation: dashboard-float-c 12s ease-in-out infinite; }
+
+.dashboard-name-shimmer {
+  background: linear-gradient(105deg, #0b1220 0%, #4f46e5 35%, #ff7eb0 65%, #0b1220 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: name-shimmer 5s linear infinite;
+}
+
+.animate-wave {
+  animation: wave 2.5s ease-in-out infinite;
+}
+
+@keyframes interview-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 126, 176, 0.55); }
+  50% { box-shadow: 0 0 0 7px rgba(255, 126, 176, 0); }
+}
+.interview-day-glow { animation: interview-glow 2.2s ease-in-out infinite; }
+
+/* — Flashcard deck animations — */
+@keyframes card-deal {
+  0% { transform: translateY(16px) scale(0.96) rotate(-1.2deg); opacity: 0; }
+  60% { transform: translateY(-3px) scale(1.005) rotate(0.4deg); opacity: 1; }
+  100% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+}
+@keyframes fade-up {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes pop-in {
+  0% { transform: scale(0.6); opacity: 0; }
+  70% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes xp-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(220%); }
+}
+
+.card-deal { animation: card-deal 0.34s cubic-bezier(0.22, 1, 0.36, 1); }
+.fade-up { animation: fade-up 0.28s ease-out; }
+.pop-in { animation: pop-in 0.32s cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* — Deck focus mode: only the deck element goes fullscreen, app chrome hides — */
+.deck-focus:fullscreen {
+  background: #f6f7fb;
+  overflow-y: auto;
+  padding: 2.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+}
+html.dark .deck-focus:fullscreen, .dark .deck-focus:fullscreen { background: var(--background); }
+.deck-focus:fullscreen > *:not(.deck-focus-float) {
+  width: 100%;
+  max-width: 44rem;
+}
+
+/* moving sheen sweeping across the XP bar */
+.xp-sheen {
+  position: relative;
+  overflow: hidden;
+}
+.xp-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: xp-shimmer 2.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-orb-a,
+  .dashboard-orb-b,
+  .dashboard-orb-c,
+  .dashboard-name-shimmer,
+  .animate-wave,
+  .interview-day-glow,
+  .card-deal,
+  .fade-up,
+  .pop-in,
+  .xp-sheen::after {
+    animation: none;
+  }
+  .dashboard-name-shimmer {
+    color: #0b1220;
+    background: none;
+    -webkit-background-clip: unset;
+    background-clip: unset;
+  }
+  html.dark .dashboard-name-shimmer, .dark .dashboard-name-shimmer {
+    color: #f1f5f9;
+    background: none;
+    -webkit-background-clip: unset;
+    background-clip: unset;
+  }
 }
 
 /* — Dark overrides for hardcoded Tailwind arbitrary classes — */
@@ -126,3 +254,144 @@ html.dark .text-\[\#5b5bf5\], .dark .text-\[\#5b5bf5\] { color: #8b8bff !importa
 html.dark .bg-\[\#5b5bf5\], .dark .bg-\[\#5b5bf5\] { background-color: #5b5bf5 !important; }
 html.dark .text-white, .dark .text-white { color: #e6e8f2; }
 html.dark .text-white\/70, .dark .text-white\/70 { color: rgba(226,232,240,0.7) !important; }
+
+/* accent + status text — readable on dark surfaces */
+html.dark .text-\[\#4f46e5\], .dark .text-\[\#4f46e5\] { color: #a5b4fc !important; }
+html.dark .text-\[\#059669\], .dark .text-\[\#059669\] { color: #34d399 !important; }
+html.dark .text-\[\#15803d\], .dark .text-\[\#15803d\] { color: #4ade80 !important; }
+html.dark .text-\[\#d97706\], .dark .text-\[\#d97706\] { color: #fbbf24 !important; }
+html.dark .text-\[\#c2410c\], .dark .text-\[\#c2410c\] { color: #fdba74 !important; }
+html.dark .text-\[\#dc2626\], .dark .text-\[\#dc2626\] { color: #f87171 !important; }
+html.dark .text-\[\#b91c1c\], .dark .text-\[\#b91c1c\] { color: #fca5a5 !important; }
+html.dark .text-\[\#be185d\], .dark .text-\[\#be185d\] { color: #f9a8d4 !important; }
+html.dark .text-\[\#64748b\], .dark .text-\[\#64748b\] { color: #94a3b8 !important; }
+html.dark .text-\[\#d6d9eb\], .dark .text-\[\#d6d9eb\] { color: #64748b !important; }
+
+/* pastel + tinted surfaces not covered above */
+html.dark .bg-\[\#fafbff\], .dark .bg-\[\#fafbff\] { background-color: var(--card-soft) !important; }
+html.dark .bg-\[\#e0e4ff\], .dark .bg-\[\#e0e4ff\] { background-color: #2c3763 !important; }
+html.dark .bg-\[\#fdf2f8\], .dark .bg-\[\#fdf2f8\] { background-color: #2a1e2e !important; }
+html.dark .bg-\[\#ecfdf5\], .dark .bg-\[\#ecfdf5\] { background-color: #15302e !important; }
+html.dark .bg-\[\#fef2f2\], .dark .bg-\[\#fef2f2\] { background-color: #2e1a1a !important; }
+html.dark .bg-\[\#fee2e2\], .dark .bg-\[\#fee2e2\] { background-color: #3a1d1d !important; }
+html.dark .bg-\[\#fff7ed\], .dark .bg-\[\#fff7ed\] { background-color: #2e2318 !important; }
+html.dark .bg-\[\#ffedd5\], .dark .bg-\[\#ffedd5\] { background-color: #2e2318 !important; }
+html.dark .bg-\[\#f0fdf4\], .dark .bg-\[\#f0fdf4\] { background-color: #14291f !important; }
+html.dark .bg-\[\#dcfce7\], .dark .bg-\[\#dcfce7\],
+html.dark .bg-\[\#d1fae5\], .dark .bg-\[\#d1fae5\] { background-color: #15302e !important; }
+html.dark .bg-\[\#fffbeb\]\/60, .dark .bg-\[\#fffbeb\]\/60 { background-color: #2a2417 !important; }
+html.dark .bg-\[\#e6e8f2\], .dark .bg-\[\#e6e8f2\] { background-color: var(--border) !important; }
+html.dark .bg-\[\#f6f7fb\]\/85, .dark .bg-\[\#f6f7fb\]\/85 { background-color: color-mix(in srgb, var(--card-soft) 85%, transparent) !important; }
+
+/* translucent white surfaces (stat cards, tiles) */
+html.dark .bg-white\/50, .dark .bg-white\/50 { background-color: color-mix(in srgb, var(--card) 55%, transparent) !important; }
+html.dark .bg-white\/70, .dark .bg-white\/70 { background-color: color-mix(in srgb, var(--card) 72%, transparent) !important; }
+html.dark .bg-white\/80, .dark .bg-white\/80 { background-color: color-mix(in srgb, var(--card) 82%, transparent) !important; }
+html.dark .bg-white\/90, .dark .bg-white\/90 { background-color: color-mix(in srgb, var(--card) 92%, transparent) !important; }
+
+/* light borders / rings that vanish on dark */
+html.dark .border-\[\#e0e4ff\], .dark .border-\[\#e0e4ff\] { border-color: var(--border-strong) !important; }
+html.dark .border-\[\#f1f2f9\], .dark .border-\[\#f1f2f9\] { border-color: var(--border) !important; }
+html.dark .border-\[\#e6e8f2\]\/80, .dark .border-\[\#e6e8f2\]\/80 { border-color: var(--border) !important; }
+html.dark .border-\[\#0b1220\], .dark .border-\[\#0b1220\] { border-color: #e2e8f0 !important; }
+html.dark .ring-\[\#0b1220\]\/20, .dark .ring-\[\#0b1220\]\/20 { --tw-ring-color: rgba(226, 232, 240, 0.25) !important; }
+html.dark .ring-\[\#0b1220\]\/30, .dark .ring-\[\#0b1220\]\/30 { --tw-ring-color: rgba(226, 232, 240, 0.3) !important; }
+
+/* hover / focus / group-hover variants — same mapping, state selectors */
+html.dark .hover\:bg-\[\#eef0ff\]:hover, .dark .hover\:bg-\[\#eef0ff\]:hover { background-color: #2a335e !important; }
+html.dark .hover\:bg-\[\#fafbff\]:hover, .dark .hover\:bg-\[\#fafbff\]:hover { background-color: var(--card-soft) !important; }
+html.dark .hover\:bg-\[\#e0e4ff\]:hover, .dark .hover\:bg-\[\#e0e4ff\]:hover { background-color: #2c3763 !important; }
+html.dark .hover\:bg-\[\#fef2f2\]:hover, .dark .hover\:bg-\[\#fef2f2\]:hover { background-color: #2e1a1a !important; }
+html.dark .hover\:bg-\[\#fee2e2\]:hover, .dark .hover\:bg-\[\#fee2e2\]:hover { background-color: #3a1d1d !important; }
+html.dark .hover\:bg-\[\#ffedd5\]:hover, .dark .hover\:bg-\[\#ffedd5\]:hover { background-color: #2e2318 !important; }
+html.dark .hover\:bg-\[\#dcfce7\]:hover, .dark .hover\:bg-\[\#dcfce7\]:hover,
+html.dark .hover\:bg-\[\#d1fae5\]:hover, .dark .hover\:bg-\[\#d1fae5\]:hover { background-color: #15302e !important; }
+html.dark .hover\:bg-\[\#e6e8f2\]:hover, .dark .hover\:bg-\[\#e6e8f2\]:hover { background-color: var(--border) !important; }
+html.dark .focus\:bg-white:focus, .dark .focus\:bg-white:focus { background-color: var(--card) !important; }
+html.dark .group:hover .group-hover\:bg-white, .dark .group:hover .group-hover\:bg-white { background-color: var(--muted) !important; }
+html.dark .group:hover .group-hover\:border-\[\#e6e8f2\], .dark .group:hover .group-hover\:border-\[\#e6e8f2\] { border-color: var(--border) !important; }
+html.dark .hover\:text-\[\#0b1220\]:hover, .dark .hover\:text-\[\#0b1220\]:hover { color: #f1f5f9 !important; }
+html.dark .hover\:text-\[\#4f46e5\]:hover, .dark .hover\:text-\[\#4f46e5\]:hover { color: #a5b4fc !important; }
+html.dark .hover\:text-\[\#67708f\]:hover, .dark .hover\:text-\[\#67708f\]:hover { color: #cbd5e1 !important; }
+html.dark .hover\:text-\[\#b91c1c\]:hover, .dark .hover\:text-\[\#b91c1c\]:hover { color: #fca5a5 !important; }
+html.dark .hover\:text-white:hover, .dark .hover\:text-white:hover { color: #ffffff !important; }
+html.dark .group:hover .group-hover\:text-\[\#4f46e5\], .dark .group:hover .group-hover\:text-\[\#4f46e5\] { color: #a5b4fc !important; }
+html.dark .hover\:border-\[\#d6d9eb\]:hover, .dark .hover\:border-\[\#d6d9eb\]:hover { border-color: var(--border-strong) !important; }
+html.dark .dashboard-name-shimmer, .dark .dashboard-name-shimmer {
+  background: linear-gradient(105deg, #f1f5f9 0%, #a5b4fc 35%, #f9a8d4 65%, #f1f5f9 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* — Schedule calendar: month label + pager share one row — */
+.schedule-calendar .rdp-months { position: relative; }
+.schedule-calendar .rdp-nav {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.schedule-calendar .rdp-month_caption {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding-right: 88px;
+}
+
+/* — Consistent focus treatment app-wide: theme accent, never browser black — */
+input:not([type="checkbox"]):not([type="radio"]):focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent) !important;
+}
+input:not([type="checkbox"]):not([type="radio"]):focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* native select popups follow the theme (no white popup in dark mode) */
+html.dark select, .dark select { color-scheme: dark; }
+html.dark option, .dark option {
+  background-color: var(--card);
+  color: var(--foreground);
+}
+
+/* checkbox/radio keep the accent focus treatment too */
+html.dark input[type="checkbox"]:focus-visible, .dark input[type="checkbox"]:focus-visible,
+html.dark input[type="radio"]:focus-visible, .dark input[type="radio"]:focus-visible,
+input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* remaining hardcoded surfaces: avatar ring, primary hover, dividers, status borders */
+html.dark .from-\[\#ffcc8a\], .dark .from-\[\#ffcc8a\] { --tw-gradient-from: #b97f2e !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+html.dark .to-\[\#ff8fa0\], .dark .to-\[\#ff8fa0\] { --tw-gradient-to: #b34a63 !important; }
+html.dark .hover\:bg-\[\#1a2744\]:hover, .dark .hover\:bg-\[\#1a2744\]:hover { background-color: #334155 !important; }
+html.dark .divide-\[\#f1f2f9\] > :not([hidden]) ~ :not([hidden]), .dark .divide-\[\#f1f2f9\] > :not([hidden]) ~ :not([hidden]) { border-color: var(--border) !important; }
+html.dark .divide-\[\#f1f2f9\] > :not([hidden]) ~ :not([hidden]), .dark .divide-\[\#f1f2f9\] > :not([hidden]) ~ :not([hidden]) { border-color: var(--border) !important; }
+html.dark .border-\[\#a7f3d0\], .dark .border-\[\#a7f3d0\] { border-color: #14532d !important; }
+html.dark .border-\[\#fecaca\], .dark .border-\[\#fecaca\] { border-color: #7f1d1d !important; }
+html.dark .border-\[\#86efac\], .dark .border-\[\#86efac\] { border-color: #14532d !important; }
+html.dark .border-\[\#fdba74\], .dark .border-\[\#fdba74\] { border-color: #7c2d12 !important; }
+html.dark .border-\[\#f9a8d4\], .dark .border-\[\#f9a8d4\] { border-color: #831843 !important; }
+html.dark .border-\[\#fcd34d\], .dark .border-\[\#fcd34d\] { border-color: #92400e !important; }
+html.dark .border-\[\#f59e0b\], .dark .border-\[\#f59e0b\] { border-color: #92400e !important; }
+html.dark .border-\[\#34d399\], .dark .border-\[\#34d399\] { border-color: #065f46 !important; }
+html.dark .hover\:border-\[\#a5b4fc\]:hover, .dark .hover\:border-\[\#a5b4fc\]:hover { border-color: #4c5db5 !important; }
+html.dark .hover\:border-\[\#c4b5fd\]:hover, .dark .hover\:border-\[\#c4b5fd\]:hover { border-color: #6d5bd0 !important; }
+html.dark .bg-\[\#ff7eb0\], .dark .bg-\[\#ff7eb0\] { background-color: #b34a63 !important; }
+html.dark .bg-\[\#f59e0b\], .dark .bg-\[\#f59e0b\] { background-color: #92400e !important; }
+html.dark .bg-\[\#10b981\], .dark .bg-\[\#10b981\] { background-color: #047857 !important; }
+html.dark .bg-\[\#c4b5fd\], .dark .bg-\[\#c4b5fd\] { background-color: #6d5bd0 !important; }

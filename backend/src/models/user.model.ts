@@ -13,13 +13,14 @@ const userSchema = new Schema<IUser>(
       lowercase: true,
       trim: true,
       match: [/^\S+@\S+\.\S+$/, "invalid email"],
-      index: true,
     },
     password: {
       type: String,
       required: true,
       select: false,
       minlength: 8,
+      // bcrypt silently ignores input past 72 bytes — reject it instead.
+      maxlength: 72,
     },
     name: {
       type: String,
@@ -44,8 +45,6 @@ const userSchema = new Schema<IUser>(
     },
   }
 );
-
-userSchema.index({ email: 1 }, { unique: true });
 
 userSchema.pre("save", async function () {
   if (!this.isModified("password")) return;

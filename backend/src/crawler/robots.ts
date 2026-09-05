@@ -4,6 +4,10 @@ import type { RobotsInfo, CrawlerConfig } from "./types.js";
 const matcher = new RobotsMatcher();
 const cache = new Map<string, { robotsTxt: string; fetchedAt: number }>();
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+// Failed robots fetches fail open, but remember the failure briefly so we
+// don't re-fetch robots.txt on every page of the same host.
+const failedAt = new Map<string, number>();
+const NEGATIVE_TTL_MS = 5 * 60 * 1000;
 
 function parseCrawlDelay(robotsTxt: string, userAgent: string): number | undefined {
   const lines = robotsTxt.split("\n");
@@ -39,6 +43,11 @@ function parseSitemaps(robotsTxt: string): string[] {
   return sitemaps;
 }
 
+function failedRecently(origin: string, now: number): boolean {
+  const at = failedAt.get(origin);
+  return at !== undefined && now - at < NEGATIVE_TTL_MS;
+}
+
 export async function getRobotsInfo(url: string, config: CrawlerConfig): Promise<RobotsInfo> {
   const origin = new URL(url).origin;
   const cached = cache.get(origin);
@@ -47,7 +56,7 @@ export async function getRobotsInfo(url: string, config: CrawlerConfig): Promise
   let robotsTxt = "";
   if (cached && now - cached.fetchedAt < CACHE_TTL_MS) {
     robotsTxt = cached.robotsTxt;
-  } else {
+  } else if (!failedRecently(origin, now)) {
     try {
       const res = await fetch(`${origin}/robots.txt`, {
         headers: { "User-Agent": config.userAgent },
@@ -56,8 +65,12 @@ export async function getRobotsInfo(url: string, config: CrawlerConfig): Promise
       if (res.ok) {
         robotsTxt = await res.text();
         cache.set(origin, { robotsTxt, fetchedAt: now });
+        failedAt.delete(origin);
+      } else {
+        failedAt.set(origin, now);
       }
     } catch {
+      failedAt.set(origin, now);
     }
   }
 
@@ -80,4 +93,5 @@ export function canCrawl(url: string, robotsTxt: string, userAgent: string): boo
 
 export function clearRobotsCache(): void {
   cache.clear();
+  failedAt.clear();
 }

@@ -299,13 +299,13 @@ void main() {
     const uTransform = gl.getUniformLocation(prog, "u_transform");
     const uSpace = gl.getUniformLocation(prog, "u_space");
     const uCursor = gl.getUniformLocation(prog, "u_cursor");
-    // u_colors[0..7] — set individually for WebGL1 portability
+    // u_colors[0..7] - set individually for WebGL1 portability
     const uColorLocs: (WebGLUniformLocation | null)[] = [];
     for (let i = 0; i < 8; i++) {
       uColorLocs.push(gl.getUniformLocation(prog, `u_colors[${i}]`));
     }
 
-    // Previous (better) palette — teal/blue Waves as specified — low → high
+    // Previous (better) palette - teal/blue Waves as specified - low → high
     const colors: [number, number, number][] = [
       [0.012, 0.11, 0.149],   // #031C26
       [0.106, 0.424, 0.659],  // #1B6CA8

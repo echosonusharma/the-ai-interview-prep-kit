@@ -9,7 +9,7 @@ export default function CommunityView() {
         <div>
           <Label>Community</Label>
           <h1 className="mt-1 text-[26px] font-extrabold tracking-tight text-[#0b1220]">You&apos;re not prepping alone</h1>
-          <p className="mt-1 text-sm text-[#67708f] max-w-[600px]">Peer mocks, live reviews, and a feed of wins — because momentum is social.</p>
+          <p className="mt-1 text-sm text-[#67708f] max-w-[600px]">Peer mocks, live reviews, and a feed of wins, because momentum is social.</p>
         </div>
         <Link href="/practice" className="rounded-full bg-[#0b1220] text-white px-5 py-2.5 text-xs font-bold shadow-sm">Find a peer mock →</Link>
       </div>
@@ -25,9 +25,9 @@ export default function CommunityView() {
           </Card>
 
           {[
-            { name: "Aarav Mehta", role: "Staff Engineer @ Meesho", time: "2h ago", text: "Shared my System Design rubric for Design WhatsApp — scored 9/10. Key was explicit trade-offs on fanout vs. latency. Happy to review yours!", likes: 24 },
-            { name: "Sanya Patel", role: "Product Designer", time: "5h ago", text: "Did 3 behavioral mocks this week. The AI coach kept flagging vague ownership. Forced me to rewrite 4 STAR stories — now they’re actually crisp.", likes: 18 },
-            { name: "Rohan Gupta", role: "Backend • 12 mocks", time: "Yesterday", text: "Looking for a DSA partner — targeting 7am IST daily for 30 min. Consistency > intensity. DM if you’re in.", likes: 31 },
+            { name: "Aarav Mehta", role: "Staff Engineer @ Meesho", time: "2h ago", text: "Shared my System Design rubric for Design WhatsApp, scored 9/10. Key was explicit trade-offs on fanout vs. latency. Happy to review yours!", likes: 24 },
+            { name: "Sanya Patel", role: "Product Designer", time: "5h ago", text: "Did 3 behavioral mocks this week. The AI coach kept flagging vague ownership. Forced me to rewrite 4 STAR stories. Now they’re actually crisp.", likes: 18 },
+            { name: "Rohan Gupta", role: "Backend • 12 mocks", time: "Yesterday", text: "Looking for a DSA partner, targeting 7am IST daily for 30 min. Consistency > intensity. DM if you’re in.", likes: 31 },
           ].map((post) => (
             <Card key={post.name} className="p-5">
               <div className="flex items-start gap-3">
@@ -56,7 +56,7 @@ export default function CommunityView() {
             <div className="mt-3 space-y-2.5">
               {[
                 { n: "D. Kim", s: "9.6", c: "32 mocks" },
-                { n: "You — Jane", s: "8.4", c: "24 mocks", me: true },
+                { n: "You (Jane)", s: "8.4", c: "24 mocks", me: true },
                 { n: "M. Singh", s: "8.3", c: "28 mocks" },
               ].map((r) => (
                 <div key={r.n} className={`flex items-center justify-between rounded-xl px-3 py-2.5 border ${r.me ? "bg-white border-[#5b5bf5]/20 shadow-sm" : "bg-white border-[#e6e8f2]"}`}>

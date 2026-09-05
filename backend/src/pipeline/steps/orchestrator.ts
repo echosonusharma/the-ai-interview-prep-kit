@@ -26,6 +26,7 @@ import {
   type QuestionDraft,
 } from "./questions.js";
 import { flashcardListSchema, flashcardsPrompt, type FlashcardDraft } from "./flashcards.js";
+import { deterministicGate, gateError, gatePrompt, gateSchema } from "./gate.js";
 import type { IKitRequirement } from "../../types/kit.types.js";
 
 export interface GenerateKitInput {
@@ -37,6 +38,8 @@ export interface GenerateKitInput {
   llm?: LlmClient;
   /** Skip DuckDuckGo + public page fetches (e2e / offline). */
   skipPublicSearch?: boolean;
+  /** Cancels the run when the case timeout fires (threaded from kit.service). */
+  signal?: AbortSignal;
 }
 
 export interface GenerateKitResult {
@@ -46,6 +49,37 @@ export interface GenerateKitResult {
 }
 
 type Req = Pick<IKitRequirement, "id" | "text" | "kind" | "priority">;
+
+/** Abort promptly instead of awaiting an orphaned crawl/LLM promise to completion. */
+function throwIfAborted(signal: AbortSignal | undefined, label: string): void {
+  if (signal?.aborted) throw new Error(`Kit generation aborted (${label})`);
+}
+
+/**
+ * Race a promise against cancellation. Residual: rejection stops *waiting*,
+ * but the underlying work can't be truly cancelled from here — crawl fetches
+ * own their AbortController inside crawler/fetcher.ts and Zen calls use a
+ * fixed 90s AbortSignal.timeout in pipeline/llm/zen.ts (read-only), so an
+ * orphaned fetch/LLM call may run until its own timeout while we move on.
+ */
+function withSignal<T>(promise: Promise<T>, signal: AbortSignal | undefined, label: string): Promise<T> {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(new Error(`Kit generation aborted (${label})`));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new Error(`Kit generation aborted (${label})`));
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (v) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(v);
+      },
+      (e) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(e);
+      }
+    );
+  });
+}
 
 const CATEGORIES: QuestionCategory[] = ["technical", "behavioural", "system-design", "company-fit"];
 const MAX_PASSES = 1;
@@ -70,16 +104,13 @@ function companyNameFrom(hostname: string, title?: string): string {
 
 export async function generateKit(input: GenerateKitInput): Promise<GenerateKitResult> {
   const progress = input.onProgress ?? (() => {});
+  const signal = input.signal;
   const days = Math.max(1, Math.min(60, Math.floor(input.days) || 1));
   const warnings: string[] = [];
   const provenance: Record<string, Provenance> = {};
   const zen = input.llm ?? new ZenClient();
   let llmCalls = 0;
   const llmBudget = env.LLM_MAX_CALLS_PER_KIT;
-  const reserveSlot = () => {
-    if (llmCalls >= llmBudget) throw new Error(`LLM budget exhausted (${llmBudget} calls)`);
-    llmCalls += 1;
-  };
 
   const disabledModels = new Set<string>();
   const isDisabled = (m: string) => disabledModels.has(m);
@@ -148,9 +179,54 @@ export async function generateKit(input: GenerateKitInput): Promise<GenerateKitR
   };
 
   const llmRun = async <T>(step: string, attempts: Attempt<T>[]) => {
-    reserveSlot();
-    return runWithFallbacks(step, attempts);
+    if (llmCalls >= llmBudget) throw new Error(`LLM budget exhausted (${llmBudget} calls)`);
+    // Budget counts attempts, not steps: every model try costs a call, so the
+    // counter increments per failover attempt via onAttempt (failover.ts).
+    return runWithFallbacks(step, attempts, {
+      signal,
+      onAttempt: () => {
+        if (llmCalls >= llmBudget) throw new Error(`LLM budget exhausted (${llmBudget} calls)`);
+        llmCalls += 1;
+      },
+    });
   };
+
+  progress("gate", "validating input");
+  throwIfAborted(signal, "gate");
+
+  // Step 0: reject junk before spending crawl + LLM budget. Failures throw
+  // with the gate prefix so runKitGeneration maps them to VALIDATION_FAILED.
+  const gateFail = deterministicGate(input.jd, input.companyUrl);
+  if (gateFail) {
+    throw gateError(gateFail);
+  }
+  const [gateModel] = leaseModelsForSteps(["gate"], disabledModels);
+  const gateRes = await withSignal(
+    llmRun(
+      "gate",
+      llmAttempts("gate", gatePrompt(input.jd, input.companyUrl), gateSchema, LLM_TOKEN_LIMITS.GATE, gateModel)
+    ),
+    signal,
+    "gate"
+  );
+  provenance.gate = gateRes.provenance;
+  const verdict = gateRes.value;
+  if (verdict.injection_detected) {
+    throw gateError(
+      `prompt-injection patterns detected in job description${verdict.reason ? ` (${verdict.reason})` : ""}`
+    );
+  }
+  if (!verdict.is_job_posting) {
+    throw gateError(
+      `input doesn't read as a job posting${verdict.reason ? ` (${verdict.reason})` : ""}`
+    );
+  }
+  if (!verdict.url_matches_jd) {
+    warnings.push(
+      `Company URL doesn't appear to match the job description${verdict.reason ? `: ${verdict.reason}` : "; kit generated from JD only."}`
+    );
+  }
+  progress("gate:done", "input valid");
 
   progress("research", `crawling ${input.companyUrl}`);
   const crawlerCfg = kitCrawlerConfig(env.isProd);
@@ -163,19 +239,23 @@ export async function generateKit(input: GenerateKitInput): Promise<GenerateKitR
   })();
   const hostLabel = companyNameFrom(host);
 
-  const [crawl, discussion] = await Promise.all([
-    crawlCompanySite(input.companyUrl, crawlerCfg).catch((e) => {
-      warnings.push(`Crawl failed: ${e instanceof Error ? e.message : e}`);
-      return null;
-    }),
-    input.skipPublicSearch
-      ? Promise.resolve({ query: hostLabel, results: [], warnings: [] as string[] })
-      : enrichPublicDiscussion(hostLabel, input.companyUrl, crawlerCfg).catch((e) => ({
-          query: hostLabel,
-          results: [],
-          warnings: [`Public discussion search failed: ${e instanceof Error ? e.message : e}`],
-        })),
-  ]);
+  const [crawl, discussion] = await withSignal(
+    Promise.all([
+      crawlCompanySite(input.companyUrl, crawlerCfg).catch((e) => {
+        warnings.push(`Crawl failed: ${e instanceof Error ? e.message : e}`);
+        return null;
+      }),
+      input.skipPublicSearch
+        ? Promise.resolve({ query: hostLabel, results: [], warnings: [] as string[] })
+        : enrichPublicDiscussion(hostLabel, input.companyUrl, crawlerCfg).catch((e) => ({
+            query: hostLabel,
+            results: [],
+            warnings: [`Public discussion search failed: ${e instanceof Error ? e.message : e}`],
+          })),
+    ]),
+    signal,
+    "research"
+  );
 
   if (crawl?.warnings?.length) warnings.push(...crawl.warnings);
   if (discussion.warnings.length) warnings.push(...discussion.warnings);
@@ -201,13 +281,18 @@ export async function generateKit(input: GenerateKitInput): Promise<GenerateKitR
   const pagesUsed = okPages.map((p) => p.url);
 
   progress("extract", "role + requirements + brief");
+  throwIfAborted(signal, "extract");
   const briefBuilt = briefPrompt(research);
   const [metaModel, reqsModel, briefModel] = leaseModelsForSteps(["extract", "extract", "brief"], disabledModels);
-  const [metaRes, reqsRes, brief] = await Promise.all([
-    llmRun("extract:meta", llmAttempts("extract", extractMetaPrompt(input.jd), metaSchema, LLM_TOKEN_LIMITS.EXTRACT_META, metaModel)),
-    llmRun("extract:reqs", llmAttempts("extract", extractRequirementsPrompt(input.jd), requirementsSchema, LLM_TOKEN_LIMITS.EXTRACT_REQS, reqsModel)),
-    llmRun("brief", llmTextAttempts("brief", briefBuilt, parseBriefText, LLM_TOKEN_LIMITS.BRIEF, briefModel)),
-  ]);
+  const [metaRes, reqsRes, brief] = await withSignal(
+    Promise.all([
+      llmRun("extract:meta", llmAttempts("extract", extractMetaPrompt(input.jd), metaSchema, LLM_TOKEN_LIMITS.EXTRACT_META, metaModel)),
+      llmRun("extract:reqs", llmAttempts("extract", extractRequirementsPrompt(input.jd), requirementsSchema, LLM_TOKEN_LIMITS.EXTRACT_REQS, reqsModel)),
+      llmRun("brief", llmTextAttempts("brief", briefBuilt, parseBriefText, LLM_TOKEN_LIMITS.BRIEF, briefModel)),
+    ]),
+    signal,
+    "extract"
+  );
   provenance.brief = brief.provenance;
   provenance["extract:meta"] = metaRes.provenance;
   provenance["extract:reqs"] = reqsRes.provenance;
@@ -250,9 +335,10 @@ export async function generateKit(input: GenerateKitInput): Promise<GenerateKitR
     };
   });
   const qModels = leaseModels(qJobs.length, disabledModels);
-  const fcBuilt = flashcardsPrompt(requirements, []);
-  const fcModel = leaseModels(1, disabledModels)[0];
-  const [qResults, fc] = await Promise.all([
+  // Flashcards run genuinely after questions (PROMPTS.md sequencing) so the
+  // prompt carries the real question bank — never concurrently with an empty one.
+  throwIfAborted(signal, "questions");
+  const qResults = await withSignal(
     Promise.all(
       qJobs.map((job, i) => {
         const prompt = questionsPrompt(job.category, job.batch, ctx);
@@ -262,9 +348,9 @@ export async function generateKit(input: GenerateKitInput): Promise<GenerateKitR
         }));
       })
     ),
-    llmRun("flashcards", llmAttempts("flashcards", fcBuilt, flashcardListSchema, LLM_TOKEN_LIMITS.FLASHCARDS, fcModel)),
-  ]);
-  provenance.flashcards = fc.provenance;
+    signal,
+    "questions"
+  );
   for (const { job, res } of qResults) {
     provenance[job.label] = res.provenance;
     for (const q of res.value.questions) {
@@ -303,36 +389,51 @@ export async function generateKit(input: GenerateKitInput): Promise<GenerateKitR
     gapAttempts += 1;
     passes += 1;
     const missing = requirements.filter((r) => uncovered.includes(r.id));
-    const buckets: Array<{ category: QuestionCategory; reqs: typeof missing }> = [];
-    const behavioural = missing.filter((r) => r.kind === "behavioural");
-    const technical = missing.filter((r) => r.kind !== "behavioural");
-    if (behavioural.length > 0) buckets.push({ category: "behavioural", reqs: behavioural });
-    if (technical.length > 0) buckets.push({ category: "technical", reqs: technical });
+    // Bucket uncovered reqs by actual category so refills keep
+    // behavioural/technical/system-design/company-fit fidelity.
+    /** Map an uncovered requirement to the question category that owns it. */
+    const categoryForGapReq = (r: Req): QuestionCategory => {
+      if (r.kind === "behavioural") return "behavioural";
+      if (r.kind === "domain") return "company-fit";
+      return r.priority === "must" ? "system-design" : "technical";
+    };
 
     type GapJob = { category: QuestionCategory; batch: Req[]; label: string };
-    const gapJobs: GapJob[] = buckets.map(({ category, reqs }) => ({
-      category,
-      batch: reqs,
-      label: `gap-pass-${gapAttempts}-${category}`,
-    }));
+    const gapJobs: GapJob[] = (() => {
+      const byCategory = new Map<QuestionCategory, Req[]>();
+      for (const r of missing) {
+        const category = categoryForGapReq(r);
+        const list = byCategory.get(category);
+        if (list) list.push(r);
+        else byCategory.set(category, [r]);
+      }
+      // CATEGORIES order keeps refill deterministic across passes.
+      return CATEGORIES.filter((c) => byCategory.has(c)).map((category) => ({
+        category,
+        batch: byCategory.get(category)!,
+        label: `gap-pass-${gapAttempts}-${category}`,
+      }));
+    })();
     const gapModels = leaseModels(gapJobs.length, disabledModels);
-    const gapResults = await Promise.all(
-      gapJobs.map((job, i) => {
-        const gapPrompt = questionsPrompt(job.category, job.batch, ctx);
-        return llmRun(job.label, llmAttempts(job.label, gapPrompt, questionListSchema, LLM_TOKEN_LIMITS.GAP_PASS, gapModels[i])).then((res) => ({
-          job,
-          res,
-        }));
-      })
+    const gapResults = await withSignal(
+      Promise.all(
+        gapJobs.map((job, i) => {
+          const gapPrompt = questionsPrompt(job.category, job.batch, ctx);
+          return llmRun(job.label, llmAttempts(job.label, gapPrompt, questionListSchema, LLM_TOKEN_LIMITS.GAP_PASS, gapModels[i])).then((res) => ({
+            job,
+            res,
+          }));
+        })
+      ),
+      signal,
+      `gap-pass-${gapAttempts}`
     );
     for (const { job, res } of gapResults) {
       provenance[job.label] = res.provenance;
       for (const q of res.value.questions) {
-        const covered = requirements.find((r) => q.requirement_ids.includes(r.id));
-        const actual: QuestionCategory = covered?.kind === "behavioural" ? "behavioural" : "technical";
         drafts.push({
           ...q,
-          category: actual,
+          category: job.category,
           requirement_ids: q.requirement_ids.filter((id) => requirements.some((r) => r.id === id)),
         });
       }
@@ -363,6 +464,20 @@ export async function generateKit(input: GenerateKitInput): Promise<GenerateKitR
   }));
 
   if (gapAttempts > 0) progress("coverage:done", `filled gaps in ${gapAttempts} pass(es)`);
+
+  progress("flashcards", `${drafts.length} questions in bank`);
+  throwIfAborted(signal, "flashcards");
+  const fcBuilt = flashcardsPrompt(
+    requirements,
+    drafts.map((d) => d.prompt)
+  );
+  const fcModel = leaseModels(1, disabledModels)[0];
+  const fc = await withSignal(
+    llmRun("flashcards", llmAttempts("flashcards", fcBuilt, flashcardListSchema, LLM_TOKEN_LIMITS.FLASHCARDS, fcModel)),
+    signal,
+    "flashcards"
+  );
+  provenance.flashcards = fc.provenance;
   progress("flashcards:done", `${fc.value.flashcards.length} cards`);
   const flashcards = fc.value.flashcards
     .filter((f) => f.front.trim() && f.back.trim())
@@ -377,6 +492,8 @@ export async function generateKit(input: GenerateKitInput): Promise<GenerateKitR
   const scheduleDays = allocateSchedule({ questions, requirements, daysAvailable: days });
   const finalUncovered = findUncovered(requirements, questions);
   const finalUncoveredMusts = findUncoveredMusts(requirements, questions);
+  // Spec Section 4: uncovered must-haves = failed case — never ship a kit
+  // that leaves a must-have requirement without a question.
   if (finalUncoveredMusts.length > 0) {
     throw new Error(
       `Coverage incomplete after ${passes} pass(es): must-have requirements with no question: ${finalUncoveredMusts.join(", ")}`

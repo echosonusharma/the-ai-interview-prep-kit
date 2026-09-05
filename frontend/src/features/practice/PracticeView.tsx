@@ -1,123 +1,167 @@
-import Link from "next/link";
-import { Card } from "@/components/ui/Card";
-import { Label } from "@/components/ui/Badge";
+"use client";
 
-const tracks = [
-  {
-    id: "tech",
-    title: "Tech & DSA",
-    desc: "Arrays, graphs, DP, and system design. AI rates code, clarity, and trade-offs.",
-    level: "Popular",
-    color: "bg-[#eef0ff]",
-    icon: "◈",
-    stats: "1.2k practicing",
-  },
-  {
-    id: "behavioral",
-    title: "Behavioral",
-    desc: "STAR stories, leadership, conflict. Get feedback on structure and empathy.",
-    level: "New drop",
-    color: "bg-[#e6fffa]",
-    icon: "◎",
-    stats: "420 practicing",
-  },
-  {
-    id: "case",
-    title: "Case Study",
-    desc: "Product sense, metrics, and execution under timed pressure.",
-    level: "Intermediate",
-    color: "bg-[#fef3c7]",
-    icon: "⬢",
-    stats: "890 practicing",
-  },
-  {
-    id: "leadership",
-    title: "Leadership",
-    desc: "Hiring, ownership, and org design — for EM & Staff loops.",
-    level: "Advanced",
-    color: "bg-[#fce7f3]",
-    icon: "✦",
-    stats: "310 practicing",
-  },
-  {
-    id: "frontend",
-    title: "Frontend System",
-    desc: "Design UIs at scale: performance, accessibility, state, and SSR.",
-    level: "Featured",
-    color: "bg-[#e0e7ff]",
-    icon: "▦",
-    stats: "650 practicing",
-  },
-  {
-    id: "marketing",
-    title: "Marketing & GTMS",
-    desc: "Positioning, funnels, and narrative for GTM interviews.",
-    level: "Beginner",
-    color: "bg-[#f1f5f9]",
-    icon: "⬣",
-    stats: "180 practicing",
-  },
-];
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { ArrowRight, CalendarClock, CalendarDays, Flame, Layers, RotateCcw, Sparkles } from "lucide-react";
+import { api } from "@/lib/api";
+import type { KitSummary } from "@/lib/types";
+import { Button } from "@/components/ui/Button";
+import { CompanyLogo } from "@/components/ui/CompanyLogo";
+import { domainOf } from "@/lib/companyLogo";
 
 export default function PracticeView() {
+  const [kits, setKits] = useState<KitSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await api.listKits();
+      setKits(r.kits.filter((k) => k.status === "done"));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load kits");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const totalDays = kits.reduce((s, k) => s + (k.days ?? 0), 0);
+
   return (
-    <div className="px-4 md:px-6 lg:px-8 py-6 pb-20 md:pb-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="flex min-h-full w-full flex-col px-4 py-6 md:px-6 lg:px-8">
+      {/* Header */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Label>Practice</Label>
-          <h1 className="mt-1 text-[26px] font-extrabold tracking-tight text-[#0b1220]">Pick your arena</h1>
-          <p className="mt-1 text-sm text-[#67708f] max-w-[600px]">Choose a track. Every session is a real interview simulation with an AI coach who interrupts, probes, and scores you.</p>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#eef0ff] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-widest text-[#5b5bf5]">
+            <Sparkles size={12} strokeWidth={2.5} aria-hidden /> Flashcards
+          </span>
+          <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-[#0b1220]">Practice</h1>
+          <p className="mt-1 text-sm text-[#67708f]">
+            Review flashcards from completed kits. Lower confidence cards surface first.
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="hidden sm:flex items-center gap-2 rounded-full bg-white border border-[#e6e8f2] px-3 py-2">
-            <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
-            <span className="text-xs font-medium text-[#0b1220]">Live coaching available</span>
+        {!loading && kits.length > 0 && (
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#e6e8f2] bg-white px-3 py-1.5 text-xs font-extrabold text-[#0b1220] shadow-sm">
+              <Layers size={13} aria-hidden /> {kits.length} {kits.length === 1 ? "deck" : "decks"}
+            </span>
+            <span className="hidden items-center gap-1.5 rounded-full border border-[#e6e8f2] bg-white px-3 py-1.5 text-xs font-bold text-[#67708f] shadow-sm sm:inline-flex">
+              <CalendarDays size={13} aria-hidden /> {totalDays} prep {totalDays === 1 ? "day" : "days"}
+            </span>
           </div>
-          <Link href="/" className="rounded-full bg-[#0b1220] text-white px-4 py-2 text-xs font-semibold">Resume last →</Link>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3" role="status" aria-label="Loading practice decks">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="animate-pulse rounded-3xl border border-[#e6e8f2] bg-white p-5">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-2xl bg-[#eef0ff]" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3.5 w-3/4 rounded bg-[#e6e8f2]" />
+                  <div className="h-3 w-1/2 rounded bg-[#f1f2f9]" />
+                </div>
+              </div>
+              <div className="mt-4 h-8 rounded-full bg-[#f1f2f9]" />
+            </div>
+          ))}
         </div>
-      </div>
-
-      <div className="mt-6 flex items-center gap-2 overflow-x-auto no-scrollbar">
-        {["All", "Tech", "Behavioral", "Case Study", "Leadership", "Marketing"].map((t, i) => (
-          <button
-            key={t}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-medium border ${i === 0 ? "bg-[#0b1220] text-white border-[#0b1220]" : "bg-white border-[#e6e8f2] text-[#67708f]"}`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {tracks.map((track) => (
-          <Card key={track.id} className="p-5 flex flex-col hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between gap-3">
-              <span className={`w-9 h-9 rounded-xl ${track.color} grid place-items-center text-sm`}>{track.icon}</span>
-              <span className="text-[10px] font-bold tracking-wide bg-[#f6f7fb] border border-[#e6e8f2] rounded-full px-2.5 py-1">{track.level}</span>
-            </div>
-            <h3 className="mt-3 text-sm font-bold text-[#0b1220]">{track.title}</h3>
-            <p className="mt-1 text-xs leading-4 text-[#67708f] min-h-[40px]">{track.desc}</p>
-            <div className="mt-4 flex items-center justify-between">
-              <span className="text-[11px] text-[#8a8fa8]">{track.stats}</span>
-              <span className="text-[11px] font-semibold text-[#5b5bf5]">12 mock sets</span>
-            </div>
-            <div className="mt-4 flex gap-2">
-              <Link href="/" className="flex-1 inline-flex justify-center rounded-full bg-[#0b1220] text-white text-xs font-semibold py-2.5 hover:bg-[#1a2744]">
-                Start session
+      ) : error ? (
+        <div className="fade-up mt-6 rounded-3xl border border-[#fecaca] bg-[#fef2f2] p-8 text-center">
+          <p className="text-sm font-semibold text-[#b91c1c]">{error}</p>
+          <Button className="mt-4" variant="secondary" onClick={() => void load()}>
+            <RotateCcw size={14} aria-hidden /> Try again
+          </Button>
+        </div>
+      ) : kits.length === 0 ? (
+        <div className="fade-up relative mt-6 overflow-hidden rounded-3xl border border-dashed border-[#d6d9eb] bg-white p-10 text-center">
+          <div aria-hidden className="dashboard-orb-a absolute -left-10 -top-10 h-32 w-32 rounded-full bg-[#5b5bf5]/15 blur-2xl" />
+          <div aria-hidden className="dashboard-orb-b absolute -bottom-10 -right-10 h-32 w-32 rounded-full bg-[#ff7eb0]/20 blur-2xl" />
+          <div className="pop-in relative mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-[#5b5bf5] to-[#b07cff] text-white shadow-md">
+            <Layers size={26} aria-hidden />
+          </div>
+          <h2 className="relative mt-3 text-base font-extrabold text-[#0b1220]">No decks yet</h2>
+          <p className="relative mx-auto mt-1 max-w-sm text-sm text-[#67708f]">
+            Complete a kit first, then practice its flashcards here. Weakest cards surface first.
+          </p>
+          <Link href="/kits/new" className="relative mt-5 inline-block">
+            <Button>Create a kit</Button>
+          </Link>
+        </div>
+      ) : (
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {kits.map((k, i) => {
+            const domain = domainOf(k.companyUrl);
+            const updated = k.updatedAt
+              ? new Date(k.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+              : null;
+            return (
+              <Link
+                key={k.id}
+                href={`/kits/${k.id}/practice`}
+                className="fade-up group relative overflow-hidden rounded-3xl border border-[#e6e8f2] bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-[#a5b4fc] hover:shadow-[0_18px_45px_-18px_rgba(91,91,245,0.5)] focus-ring"
+                style={{ animationDelay: `${Math.min(i, 8) * 60}ms` }}
+              >
+                {/* hover glow edge */}
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 top-0 h-1 origin-left scale-x-0 bg-gradient-to-r from-[#5b5bf5] via-[#8b5cf6] to-[#ff7eb0] transition-transform duration-300 group-hover:scale-x-100"
+                />
+                <div className="flex items-center gap-3.5">
+                  <CompanyLogo company={k.company || "?"} url={k.companyUrl} size={52} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[15px] font-extrabold tracking-tight text-[#0b1220]">
+                      {k.role || "Untitled role"}
+                    </div>
+                    <div className="mt-0.5 truncate text-xs font-semibold text-[#67708f]">
+                      {k.company || "Unknown company"}
+                      {domain && <span className="font-normal text-[#a0a6c2]"> · {domain}</span>}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#eef0ff] px-2.5 py-1 text-[11px] font-extrabold text-[#4f46e5]">
+                    <CalendarClock size={12} aria-hidden /> {k.days}-day plan
+                  </span>
+                  {updated && (
+                    <span className="rounded-full bg-[#f6f7fb] px-2.5 py-1 text-[11px] font-bold text-[#8a8fa8]">
+                      Updated {updated}
+                    </span>
+                  )}
+                  <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-extrabold text-[#5b5bf5]">
+                    Practice
+                    <span
+                      aria-hidden
+                      className="grid h-6 w-6 place-items-center rounded-full bg-[#0b1220] text-white transition-transform duration-300 group-hover:translate-x-1"
+                    >
+                      <ArrowRight size={12} strokeWidth={2.5} />
+                    </span>
+                  </span>
+                </div>
               </Link>
-              <button className="rounded-full bg-white border border-[#e6e8f2] px-4 py-2.5 text-xs font-semibold text-[#0b1220]">Preview</button>
-            </div>
-          </Card>
-        ))}
-      </div>
-
-      <Card className="mt-6 p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <div className="text-sm font-bold text-[#0b1220]">Can&apos;t decide?</div>
-          <div className="text-xs text-[#67708f] mt-1">Take a 3-minute placement. We&apos;ll map your weakest loop and schedule it.</div>
+            );
+          })}
         </div>
-        <Link href="/" className="inline-flex rounded-full bg-gradient-to-br from-[#ff7eb0] to-[#ffcc6a] text-white px-5 py-2.5 text-xs font-bold shadow-sm">Run placement →</Link>
-      </Card>
+      )}
+
+      {kits.length > 0 && !loading && (
+        <>
+          <div aria-hidden className="min-h-6 flex-1" />
+          <div className="-mx-4 border-t border-[#e6e8f2] bg-[#f6f7fb]/85 px-4 py-3 text-center backdrop-blur-md md:-mx-6 lg:-mx-8">
+            <p className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#a0a6c2]">
+              Tip: cards you rate 1–2 come back sooner · 3+ keeps your streak alive
+              <Flame size={12} className="text-[#c2410c]" aria-hidden />
+            </p>
+          </div>
+        </>
+      )}
     </div>
   );
 }

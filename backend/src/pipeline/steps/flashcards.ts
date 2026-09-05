@@ -11,11 +11,21 @@ export const flashcardListSchema = z.object({ flashcards: z.array(flashcardItemS
 
 export type FlashcardDraft = z.infer<typeof flashcardItemSchema>;
 
+/**
+ * Neutralize `</TAG>` collisions so untrusted text can't break out of
+ * `<DATA>...</DATA>` prompt framing. The zero-width space keeps the text
+ * human-readable while breaking exact closing-tag matches.
+ * (Duplicated per step file — steps never import from each other.)
+ */
+function escapeUntrusted(text: string): string {
+  return text.replace(/<\//g, "<\u200b/");
+}
+
 export function flashcardsPrompt(
   requirements: Pick<IKitRequirement, "id" | "text" | "kind" | "priority">[],
   questionPrompts: string[]
 ): { system: string; user: string } {
-  const reqList = requirements.slice(0, 12).map((r) => `- [${r.id}] ${r.text.slice(0, 120)}`).join("\n") || "(none)";
+  const reqList = requirements.slice(0, 12).map((r) => `- [${r.id}] ${escapeUntrusted(r.text.slice(0, 120))}`).join("\n") || "(none)";
   return {
     system: PROMPTS.flashcards,
     user: [
@@ -23,7 +33,7 @@ export function flashcardsPrompt(
       reqList,
       "</DATA>",
       "<DATA question_bank>",
-      questionPrompts.slice(0, 12).map((q, i) => `${i + 1}. ${q.slice(0, 160)}`).join("\n") || "(none yet)",
+      questionPrompts.slice(0, 12).map((q, i) => `${i + 1}. ${escapeUntrusted(q.slice(0, 160))}`).join("\n") || "(none yet)",
       "</DATA>",
     ].join("\n"),
   };

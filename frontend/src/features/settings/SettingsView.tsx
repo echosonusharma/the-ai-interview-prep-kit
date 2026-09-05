@@ -1,217 +1,278 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
-import { Card } from "@/components/ui/Card";
-import { Label } from "@/components/ui/Badge";
+import { Check, ChevronDown, CircleHelp, Keyboard, LogOut, Moon, Palette, Sun, UserRound } from "lucide-react";
+import { useAuth, userDisplayName, userInitials } from "@/contexts/AuthContext";
 import { useTheme } from "@/components/theme/ThemeProvider";
+import { Button } from "@/components/ui/Button";
+
+type Tab = "profile" | "appearance" | "shortcuts" | "faq";
+
+const TABS: Array<{ key: Tab; label: string; Icon: typeof UserRound }> = [
+  { key: "profile", label: "Profile", Icon: UserRound },
+  { key: "appearance", label: "Appearance", Icon: Palette },
+  { key: "shortcuts", label: "Shortcuts", Icon: Keyboard },
+  { key: "faq", label: "FAQ", Icon: CircleHelp },
+];
+
+const FAQS: Array<{ q: string; a: string }> = [
+  {
+    q: "How is my kit actually built?",
+    a: "In deliberate steps, not one big prompt: the company site is crawled for what they do and how they hire, public discussion of their interview process is searched, requirements are extracted from your job description, questions are generated per requirement and category, then flashcards and a day-by-day schedule are produced.",
+  },
+  {
+    q: "What is the coverage second pass?",
+    a: "After the first draft, every requirement is checked against the generated questions. Any must-have with no covering question is sent back for another generation round, and the check runs again, so kits don't ship with uncovered must-haves.",
+  },
+  {
+    q: "Will regenerating a section wipe my edits?",
+    a: "No. Regenerating the brief, a question category, or the schedule only touches that section. Questions you wrote or edited by hand are pinned and survive category regenerations.",
+  },
+  {
+    q: "How does flashcard practice ordering work?",
+    a: "Cards you rate 1–2 come back sooner; 3+ keeps your streak alive. Each session surfaces your least-confident cards first, and your XP, streak, and best streak track the run.",
+  },
+  {
+    q: "How is the study schedule allocated?",
+    a: "Deterministically in code, not by the model: your material is spread across exactly the number of days you asked for, with harder and higher-priority material placed earlier. Never crammed into the night before.",
+  },
+  {
+    q: "Can I prepare for several roles at once?",
+    a: "Yes. Use Batch upload on the kits page with a JSON file of { jd, company_url, days } objects. Each case generates independently, and one failure never aborts the rest.",
+  },
+  {
+    q: "What if the company site is unreachable or the JD is tiny?",
+    a: "The kit stays honest: unreachable sources are recorded and skipped rather than failing the run, and a thin description produces a thin kit that says so instead of inventing requirements.",
+  },
+  {
+    q: "Who can see my kits?",
+    a: "Only you. Sessions are cookie-based, every endpoint is scoped to your account, and there is no sharing or team access.",
+  },
+];
+
+const SHORTCUTS: Array<{ keys: string[]; action: string }> = [
+  { keys: ["Space"], action: "Flip flashcard" },
+  { keys: ["1–5"], action: "Rate confidence (answer shown)" },
+  { keys: ["←", "→"], action: "Previous / next card" },
+  { keys: ["R"], action: "Restart practice session" },
+  { keys: ["F"], action: "Card focus mode" },
+];
+
+function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="grid gap-2 py-5 sm:grid-cols-[180px_1fr] sm:gap-6">
+      <div>
+        <p className="text-sm font-bold text-[#0b1220]">{label}</p>
+        {hint && <p className="mt-0.5 text-xs text-[#8a8fa8]">{hint}</p>}
+      </div>
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+}
 
 export default function SettingsView() {
-  const [emailNotif, setEmailNotif] = useState(true);
-  const [pushNotif, setPushNotif] = useState(false);
-  const [weeklyDigest, setWeeklyDigest] = useState(true);
-  const { theme, toggle } = useTheme();
+  const { user, logout } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const [tab, setTab] = useState<Tab>("profile");
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const signOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await logout();
+    } finally {
+      setSigningOut(false);
+    }
+  };
 
   return (
-    <div className="px-4 md:px-6 lg:px-8 py-6 pb-20 md:pb-6">
-      {/* Header */}
-      <div>
-        <Label>Settings</Label>
-        <h1 className="mt-1 text-[26px] font-extrabold tracking-tight text-[#0b1220]">Preferences</h1>
-        <p className="mt-1 text-sm text-[#67708f] max-w-[560px]">Manage your profile, interview focus, and how PrepPilot AI nudges you. All changes save instantly — no backend wired yet.</p>
-      </div>
-
-      <div className="mt-6 grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
-        {/* Left stack */}
-        <div className="space-y-6">
-          {/* Profile */}
-          <Card className="p-5 md:p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-sm font-bold text-[#0b1220]">Profile</h2>
-                <p className="text-xs text-[#8a8fa8] mt-0.5">How you appear on reports and peer mocks.</p>
-              </div>
-              <span className="hidden sm:inline text-[11px] font-semibold bg-[#eef0ff] text-[#4f46e5] rounded-full px-2.5 py-1">Pro • Level 12</span>
-            </div>
-
-            <div className="mt-5 flex flex-col sm:flex-row gap-5">
-              <div className="flex flex-col items-center gap-2 shrink-0">
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#ffcc8a] to-[#ff8fa0] p-[2px]">
-                  <div className="w-full h-full rounded-2xl bg-white dark:bg-[#1e293b] grid place-items-center text-xl font-bold text-[#0b1220] dark:text-white">JD</div>
-                </div>
-                <button className="text-xs font-semibold text-[#5b5bf5] hover:underline">Change avatar</button>
-              </div>
-
-              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <label className="block">
-                  <span className="text-xs font-semibold text-[#0b1220]">Full name</span>
-                  <input defaultValue="Jane Doe" className="mt-1.5 w-full rounded-xl border border-[#e6e8f2] dark:border-[#334155] bg-[#f6f7fb] dark:bg-[#18233a] px-3.5 py-2.5 text-sm text-[#0b1220] dark:text-[#f1f5f9] placeholder:text-[#a0a6c2] dark:placeholder:text-[#64748b] outline-none focus:bg-white dark:focus:bg-[#1e293b] focus:border-[#5b5bf5] dark:focus:border-[#818cf8] focus:ring-2 focus:ring-[#eef0ff] dark:focus:ring-[#818cf8]/20" />
-                </label>
-                <label className="block">
-                  <span className="text-xs font-semibold text-[#0b1220]">Email</span>
-                  <input defaultValue="jane@example.com" type="email" className="mt-1.5 w-full rounded-xl border border-[#e6e8f2] dark:border-[#334155] bg-[#f6f7fb] dark:bg-[#18233a] px-3.5 py-2.5 text-sm text-[#0b1220] dark:text-[#f1f5f9] placeholder:text-[#a0a6c2] dark:placeholder:text-[#64748b] outline-none focus:bg-white dark:focus:bg-[#1e293b] focus:border-[#5b5bf5] dark:focus:border-[#818cf8] focus:ring-2 focus:ring-[#eef0ff] dark:focus:ring-[#818cf8]/20" />
-                </label>
-                <label className="block">
-                  <span className="text-xs font-semibold text-[#0b1220]">Target role</span>
-                  <select className="mt-1.5 w-full rounded-xl border border-[#e6e8f2] dark:border-[#334155] bg-[#f6f7fb] dark:bg-[#18233a] px-3.5 py-2.5 text-sm text-[#0b1220] dark:text-[#f1f5f9] outline-none focus:bg-white dark:focus:bg-[#1e293b] focus:border-[#5b5bf5] dark:focus:border-[#818cf8]">
-                    <option>Frontend Engineer</option>
-                    <option>Backend Engineer</option>
-                    <option>Fullstack</option>
-                    <option>Product Designer</option>
-                  </select>
-                </label>
-                <label className="block">
-                  <span className="text-xs font-semibold text-[#0b1220]">Timezone</span>
-                  <select className="mt-1.5 w-full rounded-xl border border-[#e6e8f2] dark:border-[#334155] bg-[#f6f7fb] dark:bg-[#18233a] px-3.5 py-2.5 text-sm text-[#0b1220] dark:text-[#f1f5f9] outline-none focus:bg-white dark:focus:bg-[#1e293b] focus:border-[#5b5bf5] dark:focus:border-[#818cf8]">
-                    <option>IST — Asia/Kolkata</option>
-                    <option>UTC</option>
-                    <option>EST — America/New_York</option>
-                  </select>
-                </label>
-              </div>
-            </div>
-
-            <div className="mt-5 flex gap-2">
-              <button className="rounded-full bg-[#0b1220] text-white px-5 py-2 text-xs font-bold hover:bg-[#1a2744]">Save profile</button>
-              <button className="rounded-full bg-white border border-[#e6e8f2] px-5 py-2 text-xs font-semibold text-[#0b1220]">Cancel</button>
-            </div>
-          </Card>
-
-          {/* Interview Focus */}
-          <Card className="p-5 md:p-6">
-            <h2 className="text-sm font-bold text-[#0b1220]">Interview focus</h2>
-            <p className="text-xs text-[#8a8fa8] mt-0.5">Pick pillars to prioritize. Affects your daily drills and mock weighting.</p>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {[
-                { label: "System Design", active: true },
-                { label: "DSA", active: true },
-                { label: "Behavioral", active: false },
-                { label: "Leadership", active: false },
-                { label: "Case Study", active: true },
-                { label: "Communication", active: false },
-              ].map((p) => (
-                <button
-                  key={p.label}
-                  className={`rounded-full px-4 py-1.5 text-xs font-semibold border transition-colors ${p.active ? "bg-[#0b1220] text-white border-[#0b1220]" : "bg-white border-[#e6e8f2] text-[#67708f] hover:bg-[#f6f7fb]"}`}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <label className="block">
-                <span className="text-xs font-semibold text-[#0b1220]">Difficulty</span>
-                <select className="mt-1.5 w-full rounded-xl border border-[#e6e8f2] dark:border-[#334155] bg-[#f6f7fb] dark:bg-[#18233a] px-3.5 py-2.5 text-sm text-[#0b1220] dark:text-[#f1f5f9] outline-none focus:bg-white dark:focus:bg-[#1e293b] focus:border-[#5b5bf5] dark:focus:border-[#818cf8]">
-                  <option>Adaptive (recommended)</option>
-                  <option>Beginner</option>
-                  <option>Intermediate</option>
-                  <option>Advanced</option>
-                </select>
-              </label>
-              <label className="block">
-                <span className="text-xs font-semibold text-[#0b1220]">Pace</span>
-                <select className="mt-1.5 w-full rounded-xl border border-[#e6e8f2] dark:border-[#334155] bg-[#f6f7fb] dark:bg-[#18233a] px-3.5 py-2.5 text-sm text-[#0b1220] dark:text-[#f1f5f9] outline-none focus:bg-white dark:focus:bg-[#1e293b] focus:border-[#5b5bf5] dark:focus:border-[#818cf8]">
-                  <option>3 sessions / week</option>
-                  <option>5 sessions / week</option>
-                  <option>Daily</option>
-                </select>
-              </label>
-              <label className="block">
-                <span className="text-xs font-semibold text-[#0b1220]">Coach tone</span>
-                <select className="mt-1.5 w-full rounded-xl border border-[#e6e8f2] dark:border-[#334155] bg-[#f6f7fb] dark:bg-[#18233a] px-3.5 py-2.5 text-sm text-[#0b1220] dark:text-[#f1f5f9] outline-none focus:bg-white dark:focus:bg-[#1e293b] focus:border-[#5b5bf5] dark:focus:border-[#818cf8]">
-                  <option>Supportive + direct</option>
-                  <option>Brutally honest</option>
-                  <option>Encouraging</option>
-                </select>
-              </label>
-            </div>
-          </Card>
-
-          {/* Notifications */}
-          <Card className="p-5 md:p-6">
-            <h2 className="text-sm font-bold text-[#0b1220]">Notifications</h2>
-            <div className="mt-4 space-y-4">
-              {[
-                { title: "Email reminders", desc: "Mock due, streak at risk, weekly recap.", value: emailNotif, setter: setEmailNotif },
-                { title: "Push notifications", desc: "Only for live cohorts and peer invites.", value: pushNotif, setter: setPushNotif },
-                { title: "Weekly digest", desc: "Sunday summary with next-week plan.", value: weeklyDigest, setter: setWeeklyDigest },
-              ].map((row) => (
-                <div key={row.title} className="flex items-center justify-between gap-4 rounded-xl bg-[#f6f7fb] border border-[#e6e8f2] px-4 py-3">
-                  <div>
-                    <div className="text-sm font-semibold text-[#0b1220]">{row.title}</div>
-                    <div className="text-xs text-[#8a8fa8]">{row.desc}</div>
-                  </div>
-                  <button
-                    onClick={() => row.setter((v) => !v)}
-                    className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${row.value ? "bg-[#5b5bf5]" : "bg-[#d6d9eb]"}`}
-                    aria-pressed={row.value}
-                  >
-                    <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${row.value ? "right-0.5" : "left-0.5"}`} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          {/* Danger */}
-          <Card className="p-5 border-amber-200">
-            <h2 className="text-sm font-bold text-[#b45309]">Danger zone</h2>
-            <p className="text-xs text-[#8a8fa8] mt-1">Export your data or delete your account. This UI is static.</p>
-            <div className="mt-3 flex gap-2">
-              <button className="rounded-full bg-white border border-[#e6e8f2] px-4 py-2 text-xs font-semibold text-[#0b1220]">Export data</button>
-              <button className="rounded-full bg-[#fef2f2] border border-[#fecaca] px-4 py-2 text-xs font-semibold text-[#b91c1c]">Delete account</button>
-            </div>
-          </Card>
+    <div className="w-full px-4 py-6 md:px-6 lg:px-8">
+      <div className="mx-auto w-full overflow-hidden rounded-3xl border border-[#e6e8f2] bg-white shadow-sm">
+        {/* Header */}
+        <div className="border-b border-[#f1f2f9] px-6 pt-6 sm:px-8">
+          <h1 className="text-xl font-extrabold tracking-tight text-[#0b1220]">Settings</h1>
+          <p className="mt-0.5 text-sm text-[#67708f]">Manage your profile and preferences.</p>
+          <div
+            className="mt-4 flex gap-1 overflow-x-auto no-scrollbar"
+            role="tablist"
+            aria-label="Settings sections"
+            onKeyDown={(e) => {
+              if (!["ArrowRight", "ArrowLeft", "Home", "End"].includes(e.key)) return;
+              e.preventDefault();
+              const i = TABS.findIndex((t) => t.key === tab);
+              const next =
+                e.key === "ArrowRight"
+                  ? TABS[(i + 1) % TABS.length]!
+                  : e.key === "ArrowLeft"
+                    ? TABS[(i - 1 + TABS.length) % TABS.length]!
+                    : e.key === "Home"
+                      ? TABS[0]!
+                      : TABS[TABS.length - 1]!;
+              setTab(next.key);
+              document.getElementById(`settings-tab-${next.key}`)?.focus();
+            }}
+          >
+            {TABS.map(({ key, label, Icon }) => (
+              <button
+                key={key}
+                id={`settings-tab-${key}`}
+                type="button"
+                role="tab"
+                aria-selected={tab === key}
+                aria-controls="settings-tabpanel"
+                tabIndex={tab === key ? 0 : -1}
+                onClick={() => setTab(key)}
+                className={`inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 pb-3 pt-1 text-sm font-bold transition-colors ${
+                  tab === key
+                    ? "border-[#5b5bf5] text-[#4f46e5]"
+                    : "border-transparent text-[#8a8fa8] hover:text-[#0b1220]"
+                }`}
+              >
+                <Icon size={14} aria-hidden />
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Right rail */}
-        <div className="space-y-4 self-start">
-          <Card className="p-5">
-            <div className="text-xs font-semibold tracking-[0.12em] text-[#a0a6c2]">APPEARANCE</div>
-            <div className="mt-4 space-y-3">
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-[#e6e8f2] px-3 py-2.5 bg-[#f6f7fb]">
-                <div>
-                  <div className="text-sm font-medium text-[#0b1220]">Dark theme</div>
-                  <div className="text-xs text-[#8a8fa8]">Toggle dark mode (persists)</div>
+        <div
+          id="settings-tabpanel"
+          role="tabpanel"
+          aria-labelledby={`settings-tab-${tab}`}
+          className="px-6 sm:px-8"
+        >
+          {tab === "profile" && (
+            <div className="fade-up divide-y divide-[#f1f2f9]">
+              <Row label="Your photo" hint="Shown across the app.">
+                <div className="flex items-center gap-4">
+                  <div
+                    aria-hidden
+                    className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#5b5bf5] to-[#b07cff] text-lg font-extrabold text-white shadow-md"
+                  >
+                    {userInitials(user)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-extrabold text-[#0b1220]">{userDisplayName(user)}</p>
+                    <p className="truncate text-xs text-[#8a8fa8]">{user?.email ?? "Not signed in"}</p>
+                  </div>
+                  <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#ecfdf5] px-2.5 py-1 text-[11px] font-extrabold text-[#059669]">
+                    <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[#10b981]" />
+                    Active
+                  </span>
                 </div>
-                <button
-                  onClick={toggle}
-                  className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${theme === "dark" ? "bg-[#5b5bf5]" : "bg-[#d6d9eb]"}`}
-                  aria-pressed={theme === "dark"}
-                >
-                  <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${theme === "dark" ? "right-0.5" : "left-0.5"}`} />
-                </button>
+              </Row>
+              <Row label="Name">
+                <p className="rounded-xl border border-[#e6e8f2] bg-[#f6f7fb] px-3.5 py-2.5 text-sm font-semibold text-[#0b1220]">
+                  {user?.name?.trim() || "-"}
+                </p>
+              </Row>
+              <Row label="Email" hint="Used for sign-in.">
+                <p className="rounded-xl border border-[#e6e8f2] bg-[#f6f7fb] px-3.5 py-2.5 text-sm font-semibold text-[#0b1220]">
+                  {user?.email ?? "-"}
+                </p>
+              </Row>
+              <div className="flex justify-end gap-2 py-5">
+                <Button variant="secondary" size="sm" onClick={() => void signOut()} disabled={signingOut}>
+                  <LogOut size={14} aria-hidden /> {signingOut ? "Signing out…" : "Sign out"}
+                </Button>
               </div>
-              <label className="flex items-center justify-between gap-3 rounded-xl border border-[#e6e8f2] px-3 py-2.5 bg-[#f6f7fb]">
-                <span className="text-sm font-medium text-[#0b1220]">Collapsed sidebar by default</span>
-                <input type="checkbox" className="w-4 h-4 rounded border-[#d6d9eb] text-[#5b5bf5]" />
-              </label>
-              <label className="flex items-center justify-between gap-3 rounded-xl border border-[#e6e8f2] px-3 py-2.5">
-                <span className="text-sm font-medium text-[#0b1220]">Compact density</span>
-                <input type="checkbox" className="w-4 h-4 rounded border-[#d6d9eb] text-[#5b5bf5]" />
-              </label>
             </div>
-            <div className="mt-3 text-xs leading-4 text-[#8a8fa8]">Sidebar expand/collapse is fixed + animated (full-height), matching your request. Toggle with the chevron in header/sidebar or the theme switch above.</div>
-          </Card>
+          )}
 
-          <Card className="p-5 bg-gradient-to-br from-[#0b1220] to-[#1e1b4b] text-white border-[#0b1220]">
-            <div className="text-sm font-bold">Pro tip</div>
-            <div className="text-xs leading-4 opacity-80 mt-1">Keep your focus to 2 pillars for 14 days. Your readiness bar moves fastest with depth, not breadth.</div>
-            <button className="mt-3 rounded-full bg-white text-[#0b1220] px-4 py-2 text-xs font-bold">View readiness history →</button>
-          </Card>
+          {tab === "appearance" && (
+            <div className="fade-up divide-y divide-[#f1f2f9]">
+              <Row label="Theme" hint="Applies instantly across the app.">
+                <div className="grid max-w-sm grid-cols-2 gap-1 rounded-full bg-[#f1f2f9] p-1" role="group" aria-label="Theme">
+                  {(
+                    [
+                      { value: "light", label: "Light", Icon: Sun },
+                      { value: "dark", label: "Dark", Icon: Moon },
+                    ] as const
+                  ).map(({ value, label, Icon }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setTheme(value)}
+                      aria-pressed={theme === value}
+                      className={`inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold transition-all ${
+                        theme === value ? "bg-white text-[#0b1220] shadow-sm" : "text-[#8a8fa8] hover:text-[#0b1220]"
+                      }`}
+                    >
+                      <Icon size={14} aria-hidden />
+                      {label}
+                      {theme === value && <Check size={14} strokeWidth={3} className="text-[#059669]" aria-hidden />}
+                    </button>
+                  ))}
+                </div>
+              </Row>
+              <div className="py-5">
+                <p className="text-xs text-[#8a8fa8]">Keyboard theme toggle coming from the top bar still works.</p>
+              </div>
+            </div>
+          )}
 
-          <Card className="p-5">
-            <div className="text-xs font-semibold tracking-[0.12em] text-[#a0a6c2]">NAVIGATION</div>
-            <ul className="mt-3 space-y-1.5 text-sm">
-              <li><Link href="/" className="text-[#5b5bf5] font-semibold hover:underline">→ Dashboard</Link></li>
-              <li><Link href="/practice" className="text-[#67708f] hover:text-[#0b1220]">→ Practice</Link></li>
-              <li><Link href="/resources" className="text-[#67708f] hover:text-[#0b1220]">→ Resources</Link></li>
-              <li><Link href="/community" className="text-[#67708f] hover:text-[#0b1220]">→ Community</Link></li>
-            </ul>
-            <div className="mt-3 text-xs text-[#8a8fa8]">All sidebar items now route correctly. No more /resources mis-wire.</div>
-          </Card>
+          {tab === "shortcuts" && (
+            <div className="fade-up divide-y divide-[#f1f2f9]">
+              {SHORTCUTS.map((s) => (
+                <div key={s.action} className="flex items-center justify-between gap-3 py-4">
+                  <span className="text-sm font-semibold text-[#0b1220]">{s.action}</span>
+                  <span className="flex gap-1.5">
+                    {s.keys.map((k) => (
+                      <kbd
+                        key={k}
+                        className="rounded-lg border border-[#e6e8f2] bg-[#f6f7fb] px-2 py-1 font-mono text-[11px] font-bold text-[#67708f]"
+                      >
+                        {k}
+                      </kbd>
+                    ))}
+                  </span>
+                </div>
+              ))}
+              <div className="py-5">
+                <p className="text-xs text-[#8a8fa8]">Available on kit and practice pages.</p>
+              </div>
+            </div>
+          )}
+
+          {tab === "faq" && (
+            <div className="fade-up py-2">
+              {FAQS.map((f, i) => {
+                const open = openFaq === i;
+                return (
+                  <div key={f.q} className="border-b border-[#f1f2f9] last:border-0">
+                    <button
+                      type="button"
+                      onClick={() => setOpenFaq(open ? null : i)}
+                      aria-expanded={open}
+                      aria-controls={`faq-answer-${i}`}
+                      className="focus-ring flex w-full items-center justify-between gap-3 py-4 text-left"
+                    >
+                      <span className="text-sm font-bold text-[#0b1220]">{f.q}</span>
+                      <span
+                        aria-hidden
+                        className={`grid h-7 w-7 shrink-0 place-items-center rounded-full transition-all duration-300 ${
+                          open ? "rotate-180 bg-[#0b1220] text-white" : "bg-[#f1f2f9] text-[#67708f]"
+                        }`}
+                      >
+                        <ChevronDown size={14} strokeWidth={2.5} />
+                      </span>
+                    </button>
+                    <div
+                      id={`faq-answer-${i}`}
+                      aria-hidden={!open}
+                      className={`grid transition-all duration-300 ease-out ${
+                        open ? "grid-rows-[1fr] pb-4 opacity-100" : "grid-rows-[0fr] opacity-0"
+                      }`}
+                    >
+                      <p hidden={!open} className="overflow-hidden text-sm leading-relaxed text-[#67708f]">{f.a}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -8,6 +8,8 @@ export const LLM_TOKEN_LIMITS = {
   QUESTIONS: 3_000,
   GAP_PASS: 2_500,
   FLASHCARDS: 2_000,
+  /** Gate verdict is a tiny JSON object — keep it cheap. */
+  GATE: 800,
   /** Muse Responses API — reasoning can consume most of the budget. */
   MUSE_MIN: 12_000,
 } as const;

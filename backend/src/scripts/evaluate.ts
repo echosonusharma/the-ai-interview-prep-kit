@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { z } from "zod";
 import { generateKit } from "../pipeline/steps/orchestrator.js";
+import { GATE_REJECTION_PREFIX } from "../pipeline/steps/gate.js";
 import { describeProviders, env } from "../config/env.js";
 import pc from "picocolors";
 import { logStyle as s } from "../pipeline/log.js";
@@ -16,7 +17,7 @@ const inputSchema = z.array(caseSchema);
 function errorCode(message: string): string {
   if (/timed out after/i.test(message)) return "CASE_TIMEOUT";
   if (/unreachable|enotfound|econn|timeout|fetch failed/i.test(message)) return "COMPANY_UNREACHABLE";
-  if (/validat/i.test(message)) return "VALIDATION_FAILED";
+  if (message.startsWith(GATE_REJECTION_PREFIX)) return "VALIDATION_FAILED";
   if (/coverage incomplete/i.test(message)) return "COVERAGE_FAILED";
   if (/budget/i.test(message)) return "LLM_FAILED";
   return "PIPELINE_FAILED";
@@ -52,10 +53,18 @@ function colorStep(step: string): string {
 
 async function main() {
   const args = process.argv.slice(2);
-  const inputPath = args[args.indexOf("--input") + 1];
-  const outputPath = args[args.indexOf("--output") + 1];
+  const argValue = (flag: string): string | undefined => {
+    const i = args.indexOf(flag);
+    if (i < 0) return undefined;
+    const value = args[i + 1];
+    return value && !value.startsWith("--") ? value : undefined;
+  };
+  const inputPath = argValue("--input");
+  const outputPath = argValue("--output");
   if (!inputPath || !outputPath) {
     console.error(s.fail("Usage: npm run evaluate -- --input <cases.json> --output <kits.json>"));
+    if (!inputPath) console.error(s.fail("Missing required flag: --input <cases.json>"));
+    if (!outputPath) console.error(s.fail("Missing required flag: --output <kits.json>"));
     process.exit(1);
   }
 

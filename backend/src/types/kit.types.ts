@@ -1,10 +1,19 @@
 import type { Document, Types } from "mongoose";
 
+export type RequirementOrigin = "generated" | "edited" | "user";
+
+export interface IKitRequirementState {
+  origin: RequirementOrigin;
+  pinned: boolean;
+  editedAt?: Date;
+}
+
 export interface IKitRequirement {
   id: string;
   text: string;
   kind: "technical" | "behavioural" | "domain";
   priority: "must" | "nice";
+  _state?: IKitRequirementState;
 }
 
 export interface IKitQuestionState {

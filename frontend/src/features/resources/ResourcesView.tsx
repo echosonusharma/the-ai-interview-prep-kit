@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/Card";
 import { Label } from "@/components/ui/Badge";
 
 const featured = [
-  { title: "System Design — The Field Guide", tag: "Playbook", read: "18 min", color: "bg-[#eef0ff]" },
+  { title: "System Design: The Field Guide", tag: "Playbook", read: "18 min", color: "bg-[#eef0ff]" },
   { title: "Behavioral: Writing STAR stories that land", tag: "Essay", read: "9 min", color: "bg-[#e6fffa]" },
   { title: "DSA Patterns you actually need for 2026", tag: "Cheat sheet", read: "12 min", color: "bg-[#fef3c7]" },
 ];
@@ -14,7 +14,7 @@ export default function ResourcesView() {
       <div>
         <Label>Resources</Label>
         <h1 className="mt-1 text-[26px] font-extrabold tracking-tight text-[#0b1220]">Learn with intent</h1>
-        <p className="mt-1 text-sm text-[#67708f] max-w-[640px]">Curated playbooks, annotated recordings, and drills — all mapped to the same rubric your mock coach uses.</p>
+        <p className="mt-1 text-sm text-[#67708f] max-w-[640px]">Curated playbooks, annotated recordings, and drills, all mapped to the same rubric your mock coach uses.</p>
       </div>
 
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-4">

@@ -1,6 +1,12 @@
 "use client";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
+import { LogOut, Search } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { useAuth } from "@/contexts/AuthContext";
+
+const MIN_QUERY = 4;
 
 export function Topbar({
   collapsed,
@@ -11,6 +17,36 @@ export function Topbar({
   onToggle?: () => void;
   onMobileToggle?: () => void;
 }) {
+  const { logout } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [signingOut, setSigningOut] = useState(false);
+
+  const signOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await logout();
+    } finally {
+      setSigningOut(false);
+    }
+  };
+  // Kits hub has its own search box - hide the global one there to avoid duplicates.
+  const onKitsPage = pathname?.startsWith("/kits") ?? false;
+  const [value, setValue] = useState("");
+  const [tooShort, setTooShort] = useState(false);
+
+  // Fires only on Enter with 4+ chars - deep-links to the kits hub search.
+  const submit = () => {
+    const q = value.trim();
+    if (q.length < MIN_QUERY) {
+      setTooShort(true);
+      return;
+    }
+    setTooShort(false);
+    router.push(`/kits/new?q=${encodeURIComponent(q)}`);
+  };
+
   return (
     <header className="h-14 shrink-0 bg-white border-b border-[#e6e8f2] flex items-center justify-between px-3 md:px-4 gap-3 sticky top-0 z-30">
       <div className="flex items-center gap-2">
@@ -46,15 +82,62 @@ export function Topbar({
         </Link>
       </div>
 
+      {/* Center - global kit search (hidden on kits pages, they have their own) */}
+      {!onKitsPage && (
+      <form
+        className="hidden min-w-0 flex-1 justify-center md:flex"
+        role="search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        <label className="group relative w-full max-w-xl">
+          <Search
+            size={16}
+            aria-hidden
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-(--text-faint) transition-colors group-focus-within:text-(--accent)"
+          />
+          <input
+            type="search"
+            value={value}
+            onChange={(e) => {
+              setValue(e.target.value);
+              if (tooShort) setTooShort(false);
+            }}
+            placeholder="Search kits by company, role, or skill…"
+            aria-label="Search kits"
+            aria-invalid={tooShort}
+            aria-describedby={tooShort ? "topbar-search-error" : undefined}
+            className={`w-full rounded-full border bg-(--card-soft) py-2 pl-10 pr-16 text-[13px] font-medium text-(--foreground) outline-none transition-all placeholder:font-normal placeholder:text-(--text-faint) hover:border-(--border-strong) focus:border-(--accent) focus:bg-(--card) focus:shadow-[0_0_0_4px_var(--accent-soft)] [&::-webkit-search-cancel-button]:hidden ${
+              tooShort ? "border-red-300" : "border-(--border)"
+            }`}
+          />
+          <kbd
+            aria-hidden
+            className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded-full border border-(--border) bg-(--card) px-2 py-0.5 text-[10px] font-semibold tracking-widest text-(--text-faint) lg:inline-flex"
+          >
+            Enter ↵
+          </kbd>
+          {tooShort && (
+            <span id="topbar-search-error" role="alert" className="absolute -bottom-5 left-4 text-[11px] font-semibold text-[#dc2626]">
+              Type at least 4 characters to search
+            </span>
+          )}
+        </label>
+      </form>
+      )}
+
       <div className="flex items-center gap-2">
         <ThemeToggle />
-        <Link href="/settings" className="hidden sm:inline-flex items-center gap-2 text-xs font-medium text-[#0b1220] border border-[#e6e8f2] rounded-full px-3 py-1.5 bg-white hover:bg-[#f6f7fb]">
-          <span className="w-6 h-6 rounded-full bg-[#eef0ff] flex items-center justify-center text-[10px] font-bold text-[#4f46e5]">JD</span>
-          Jane Doe
-        </Link>
-        <Link href="/settings" className="sm:hidden w-7 h-7 rounded-full bg-[#eef0ff] flex items-center justify-center text-[10px] font-bold text-[#4f46e5] border border-[#e6e8f2]">
-          JD
-        </Link>
+        <button
+          type="button"
+          onClick={() => void signOut()}
+          disabled={signingOut}
+          className="inline-flex items-center gap-1.5 rounded-full border border-[#e6e8f2] bg-white px-3 py-1.5 text-xs font-medium text-[#0b1220] hover:bg-[#f6f7fb] disabled:opacity-60"
+        >
+          <LogOut size={14} aria-hidden /> {signingOut ? "Signing out…" : "Sign out"}
+        </button>
       </div>
     </header>
   );

@@ -3,7 +3,7 @@ import { ShaderBackground } from "@/components/shader/ShaderBackground";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen flex flex-col relative isolate overflow-hidden">
+    <div className="min-h-screen flex flex-col relative isolate overflow-x-clip">
       {/* minimal top bar for auth - back to home */}
       <header className="w-full bg-transparent relative z-10">
         <div className="max-w-[1440px] w-full mx-auto px-6 py-4 flex items-center justify-between">
@@ -16,7 +16,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             <span className="font-semibold text-sm tracking-tight text-[#0b1220]">PrepPilot AI</span>
             <span className="hidden sm:inline text-[10px] font-semibold tracking-widest text-[#0b1220] ml-1 border border-[#0b1220]/10 bg-white rounded-full px-2 py-0.5">INTERVIEW KIT</span>
           </Link>
-          <Link href="/" className="inline-flex items-center rounded-full bg-white border border-[#e6e8f2] px-3 py-1.5 text-xs font-medium text-[#0b1220] shadow-sm hover:bg-[#f6f7fb]">← Back to dashboard</Link>
         </div>
       </header>
       <ShaderBackground />

@@ -18,27 +18,30 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const saved = localStorage.getItem("theme") as Theme | null;
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const initial = saved ?? (prefersDark ? "dark" : "light");
-    // Sync with external store (localStorage + media query) — valid useEffect
+    // Light is always the default; only use dark if user explicitly chose it
+    const initial: Theme = saved === "dark" ? "dark" : "light";
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setTheme(initial);
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (mounted) localStorage.setItem("theme", theme);
+    if (!mounted) return;
+    const root = document.documentElement;
+    root.classList.toggle("dark", theme === "dark");
+    root.style.colorScheme = theme;
+    localStorage.setItem("theme", theme);
+    // Provider only mounts under (app); clean up when leaving so (auth) stays light.
+    return () => {
+      root.classList.remove("dark");
+    };
   }, [theme, mounted]);
 
   const toggle = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
 
-  // Scoped dark: only this subtree gets .dark, so (auth) pages stay light
-  // Avoid FOUC: render without dark until mounted, then apply
   return (
     <ThemeCtx.Provider value={{ theme, toggle, setTheme }}>
-      <div className={theme === "dark" && mounted ? "dark" : ""} style={{ colorScheme: theme } as React.CSSProperties}>
-        {children}
-      </div>
+      {children}
     </ThemeCtx.Provider>
   );
 }

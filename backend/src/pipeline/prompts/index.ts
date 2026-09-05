@@ -9,6 +9,7 @@ function load(name: string): string {
 }
 
 export const PROMPTS = {
+  gate: load("gate.system.md"),
   extractMeta: load("extract-meta.system.md"),
   extractReqs: load("extract-requirements.system.md"),
   brief: load("brief.system.md"),

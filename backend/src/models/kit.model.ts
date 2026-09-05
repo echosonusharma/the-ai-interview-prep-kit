@@ -3,6 +3,7 @@ import { validateKitDocument } from "../validators/kit.validator.js";
 import type {
   IKit,
   IKitRequirement,
+  IKitRequirementState,
   IKitQuestion,
   IKitQuestionState,
   IKitFlashcard,
@@ -24,12 +25,22 @@ export type {
 
 // Sub-schemas
 
+const requirementStateSchema = new Schema<IKitRequirementState>(
+  {
+    origin: { type: String, enum: ["generated", "edited", "user"], default: "generated", required: true },
+    pinned: { type: Boolean, default: false },
+    editedAt: { type: Date },
+  },
+  { _id: false }
+);
+
 const requirementSchema = new Schema<IKitRequirement>(
   {
     id: { type: String, required: true },
     text: { type: String, required: true },
     kind: { type: String, enum: ["technical", "behavioural", "domain"], required: true },
     priority: { type: String, enum: ["must", "nice"], required: true },
+    _state: { type: requirementStateSchema, default: () => ({ origin: "generated", pinned: false }) },
   },
   { _id: false }
 );
@@ -46,7 +57,7 @@ const questionStateSchema = new Schema<IKitQuestionState>(
 const questionSchema = new Schema<IKitQuestion>(
   {
     id: { type: String, required: true },
-    requirement_ids: { type: [String], required: true },
+    requirement_ids: { type: [String], default: [] },
     category: {
       type: String,
       enum: ["technical", "behavioural", "system-design", "company-fit"],
@@ -74,7 +85,7 @@ const flashcardSchema = new Schema<IKitFlashcard>(
     id: { type: String, required: true },
     front: { type: String, required: true },
     back: { type: String, required: true },
-    requirement_ids: { type: [String], required: true },
+    requirement_ids: { type: [String], default: [] },
     _state: { type: flashcardStateSchema, default: () => ({ origin: "generated", pinned: false }) },
   },
   { _id: false }
@@ -84,7 +95,7 @@ const scheduleDaySchema = new Schema<IKitScheduleDay>(
   {
     day: { type: Number, required: true, min: 1 },
     focus: { type: String, required: true },
-    question_ids: { type: [String], required: true },
+    question_ids: { type: [String], default: [] },
     minutes: {
       type: Number,
       required: true,
@@ -189,13 +200,19 @@ const kitSchema = new Schema<IKit>(
     },
 
     version: { type: Number, default: 1 },
-    generationId: { type: String, index: true, sparse: true },
+    generationId: { type: String },
   },
   {
     timestamps: true,
-    versionKey: false,
+    // Internal optimistic-concurrency key. Every save() matches on __rev and
+    // bumps it, so concurrent load → mutate → save cycles throw VersionError
+    // instead of silently losing one writer's edits. The user-visible content
+    // counter is the separate `version` path above — untouched by this.
+    versionKey: "__rev",
     toJSON: {
       transform(_doc, ret: Record<string, unknown>) {
+        // Never leak the internal revision counter to API clients.
+        delete ret.__rev;
         return ret;
       },
     },
@@ -227,7 +244,11 @@ kitSchema.pre("validate", function () {
 });
 
 kitSchema.methods.toAppendixJSON = function (): Record<string, unknown> {
-  const obj = this.toObject() as IKit & { _id: unknown; __v: unknown };
+  const obj = this.toObject() as IKit & { _id: unknown; __rev: unknown };
+  const stripR = (r: IKitRequirement) => {
+    const { _state, ...rest } = r as IKitRequirement & { _state?: unknown };
+    return rest;
+  };
   const stripQ = (q: IKitQuestion) => {
     const { _state, ...rest } = q as IKitQuestion & { _state?: unknown };
     return rest;
@@ -243,7 +264,12 @@ kitSchema.methods.toAppendixJSON = function (): Record<string, unknown> {
       what_they_do: obj.company_brief.what_they_do,
       sources: obj.company_brief.sources,
     },
-    role: obj.role,
+    role: {
+      title: obj.role.title,
+      seniority: obj.role.seniority,
+      responsibilities: obj.role.responsibilities,
+      requirements: obj.role.requirements.map(stripR),
+    },
     questions: obj.questions.map(stripQ),
     flashcards: obj.flashcards.map(stripF),
     schedule: {
