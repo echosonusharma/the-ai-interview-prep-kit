@@ -8,7 +8,8 @@ export function gateError(reason: string): Error {
   return new Error(`${GATE_REJECTION_PREFIX}${reason}`);
 }
 
-export const GATE_MIN_JD_CHARS = 50;
+export const GATE_MIN_JD_CHARS = 500;
+export const GATE_MAX_JD_CHARS = 5000;
 
 const MIN_JOB_SIGNALS = 2;
 
@@ -44,7 +45,10 @@ const STRONG_INJECTION = [
 export function deterministicGate(jd: string, _companyUrl: string): string | null {
   const normalized = jd.replace(/\s+/g, " ").trim();
   if (normalized.length < GATE_MIN_JD_CHARS) {
-    return `Job description too short (${normalized.length} chars); paste the full posting (50+ characters).`;
+    return `Job description too short (${normalized.length} chars); paste the full posting (${GATE_MIN_JD_CHARS}+ characters).`;
+  }
+  if (normalized.length > GATE_MAX_JD_CHARS) {
+    return `Job description too long (${normalized.length} chars); paste ${GATE_MAX_JD_CHARS} characters or fewer.`;
   }
   if (STRONG_INJECTION.some((re) => re.test(normalized))) {
     return "Job description contains prompt-injection patterns; remove instructions aimed at the AI and resubmit the raw posting.";

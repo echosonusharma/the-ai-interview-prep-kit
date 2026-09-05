@@ -4,6 +4,8 @@ import { z } from "zod";
 
 const objectIdParam = z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid id");
 const subId = z.string().min(1).max(64);
+const MIN_JD_CHARS = 500;
+const MAX_JD_CHARS = 5000;
 
 const httpUrl = z
   .string()
@@ -25,6 +27,12 @@ const days = z.preprocess(
 );
 const requirementIds = z.array(subId).max(50);
 
+const rawJd = z
+  .string()
+  .trim()
+  .min(MIN_JD_CHARS, `Job description must be at least ${MIN_JD_CHARS} characters`)
+  .max(MAX_JD_CHARS, `Job description must be at most ${MAX_JD_CHARS} characters`);
+
 // Auth
 export const signupBody = z.object({
   email: z.string().trim().toLowerCase().email().max(254),
@@ -37,15 +45,15 @@ export const loginBody = z.object({
   password: z.string().min(1).max(72),
 });
 
-// rawJd floor 50 matches the gate and the "50+ chars" UI hint.
+// rawJd floor mirrors the generation gate and UI hint.
 export const kitCase = z.object({
-  rawJd: z.string().trim().min(50, "Job description must be at least 50 characters").max(100000),
+  rawJd,
   companyUrl: httpUrl,
   days,
 });
 
 export const createKitBody = z.object({
-  rawJd: z.string().trim().min(50, "Job description must be at least 50 characters").max(100000),
+  rawJd,
   companyUrl: httpUrl,
   days,
 });

@@ -18,6 +18,8 @@ import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 
 const DAY_PRESETS = [1, 3, 5, 7, 14, 30];
+const MIN_JD_CHARS = 500;
+const MAX_JD_CHARS = 5000;
 
 export function CreateKitForm() {
   const router = useRouter();
@@ -32,7 +34,9 @@ export function CreateKitForm() {
   const submitSingle = async () => {
     if (loading) return;
     if (!jdReady || !urlReady) {
-      setError("Add a fuller job description (50+ characters) and a valid company URL.");
+      setError(
+        `Add a job description between ${MIN_JD_CHARS}-${MAX_JD_CHARS} characters and a valid company URL.`
+      );
       return;
     }
     setLoading(true);
@@ -85,7 +89,9 @@ export function CreateKitForm() {
     }
   };
 
-  const jdReady = rawJd.trim().length >= 50;
+  const jdChars = rawJd.trim().length;
+  const jdTooLong = jdChars > MAX_JD_CHARS;
+  const jdReady = jdChars >= MIN_JD_CHARS && jdChars <= MAX_JD_CHARS;
   const urlReady = /^https?:\/\/.+\..+/.test(companyUrl.trim());
 
   return (
@@ -155,6 +161,7 @@ export function CreateKitForm() {
           </div>
         ) : (
           <form
+            noValidate
             className="mt-5 space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
@@ -166,17 +173,21 @@ export function CreateKitForm() {
                 <span className="inline-flex items-center gap-1.5">
                   <FileText size={13} className="text-[#8a8fa8]" aria-hidden /> Job description
                 </span>
-                <span className={`inline-flex items-center gap-1 font-semibold ${jdReady ? "text-[#059669]" : "text-[#a0a6c2]"}`}>
-                  {rawJd.trim().length} chars
-                  {jdReady ? (<><Check size={12} strokeWidth={3} aria-hidden /> ready</>) : "· 50+ to go"}
+                <span className={`inline-flex items-center gap-1 font-semibold ${jdReady ? "text-[#059669]" : jdTooLong ? "text-[#b91c1c]" : "text-[#a0a6c2]"}`}>
+                  {jdChars} chars
+                  {jdReady ? (<><Check size={12} strokeWidth={3} aria-hidden /> ready</>) : jdTooLong ? `· ${MAX_JD_CHARS} max` : `· ${MIN_JD_CHARS}+ needed`}
                 </span>
               </span>
               <textarea
                 required
-                minLength={50}
+                minLength={MIN_JD_CHARS}
+                maxLength={MAX_JD_CHARS}
                 rows={8}
                 value={rawJd}
-                onChange={(e) => setRawJd(e.target.value)}
+                onChange={(e) => {
+                  setRawJd(e.target.value);
+                  setError(null);
+                }}
                 placeholder="Paste the full job posting… responsibilities, requirements, nice-to-haves"
                 className="focus-ring mt-1.5 w-full resize-y rounded-2xl border border-[#e6e8f2] bg-[#f6f7fb] px-3.5 py-2.5 text-sm text-[#0b1220] outline-none transition-colors placeholder:text-[#a0a6c2] focus:border-[#5b5bf5] focus:bg-white"
               />
@@ -196,7 +207,10 @@ export function CreateKitForm() {
                 required
                 type="url"
                 value={companyUrl}
-                onChange={(e) => setCompanyUrl(e.target.value)}
+                onChange={(e) => {
+                  setCompanyUrl(e.target.value);
+                  setError(null);
+                }}
                 placeholder="https://company.com"
                 className="focus-ring mt-1.5 w-full rounded-2xl border border-[#e6e8f2] bg-[#f6f7fb] px-3.5 py-2.5 text-sm text-[#0b1220] outline-none transition-colors placeholder:text-[#a0a6c2] focus:border-[#5b5bf5] focus:bg-white"
               />
