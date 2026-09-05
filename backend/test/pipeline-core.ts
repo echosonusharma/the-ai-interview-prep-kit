@@ -3,6 +3,13 @@ import { allocateSchedule } from "../src/pipeline/schedule.js";
 import { findUncovered, findUncoveredMusts } from "../src/pipeline/coverage.js";
 import { salvageJson, coerceSalvagedRoot } from "../src/pipeline/llm/client.js";
 import { extractionSchema } from "../src/pipeline/steps/extract.js";
+import {
+  cleanRequirementIds,
+  categoryForRequirement,
+  chunkGapBatch,
+  dedupeDrafts,
+  backstopDraftFor,
+} from "../src/pipeline/steps/questions.js";
 import { parseBriefText, looksLikeBriefReasoning } from "../src/pipeline/steps/brief.js";
 import { validateKitAppendix } from "../src/validators/kit.validator.js";
 
@@ -95,6 +102,34 @@ check("coverage is empty when all covered; musts subset works", () => {
   assert.deepStrictEqual(findUncoveredMusts(reqs, qs2), ["r1"]);
 });
 
+check("gap helpers: ids normalize, categories route by kind, batches chunk", () => {
+  const reqs = [{ id: "r1" }, { id: "r2" }];
+  assert.deepStrictEqual(cleanRequirementIds([" R1 ", "r2", "r9", 42], reqs), ["r1", "r2"]);
+  assert.strictEqual(categoryForRequirement({ kind: "technical", priority: "must" }), "technical");
+  assert.strictEqual(categoryForRequirement({ kind: "behavioural", priority: "must" }), "behavioural");
+  assert.strictEqual(categoryForRequirement({ kind: "domain", priority: "nice" }), "company-fit");
+  const chunks = chunkGapBatch(["a", "b", "c", "d", "e", "f", "g"]);
+  assert.strictEqual(chunks.length, 2);
+  assert.deepStrictEqual(chunks[0], ["a", "b", "c", "d", "e", "f"]);
+});
+
+check("dedupe merges requirement refs instead of dropping coverage", () => {
+  const out = dedupeDrafts([
+    { prompt: "Walk through X", requirement_ids: ["r1"] },
+    { prompt: "walk through x ", requirement_ids: ["r5"] },
+  ]);
+  assert.strictEqual(out.length, 1);
+  assert.deepStrictEqual([...out[0].requirement_ids].sort(), ["r1", "r5"]);
+});
+
+check("backstop draft grounds in requirement text with a valid ref", () => {
+  const d = backstopDraftFor({ id: "r7", text: "3+ years with Postgres", kind: "technical", priority: "must" }, "senior");
+  assert.strictEqual(d.category, "technical");
+  assert.deepStrictEqual(d.requirement_ids, ["r7"]);
+  assert.ok(d.prompt.includes("3+ years with Postgres"));
+  assert.ok(d.answer_outline.includes(";"));
+  assert.strictEqual(d.difficulty, 3);
+});
 check("salvageJson pulls JSON from fenced and noisy model text", () => {
   assert.deepStrictEqual(salvageJson('```json\n{"a":1}\n```'), { a: 1 });
   assert.deepStrictEqual(salvageJson('[{"a":1}]'), [{ a: 1 }]);

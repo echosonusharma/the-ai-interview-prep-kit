@@ -22,6 +22,11 @@ import {
   questionListSchema,
   questionsPrompt,
   requirementsForCategory,
+  cleanRequirementIds,
+  categoryForRequirement,
+  chunkGapBatch,
+  dedupeDrafts,
+  backstopDraftFor,
   type QuestionCategory,
   type QuestionDraft,
 } from "./questions.js";
@@ -82,7 +87,11 @@ function withSignal<T>(promise: Promise<T>, signal: AbortSignal | undefined, lab
 }
 
 const CATEGORIES: QuestionCategory[] = ["technical", "behavioural", "system-design", "company-fit"];
-const MAX_PASSES = 1;
+// Two LLM gap passes, then a deterministic backstop for leftover musts.
+// Bounded deliberately: free-tier rate limits + the 5-cases-in-15-min batch
+// budget leave no room for unbounded retries; the backstop (zero LLM calls)
+// guarantees must coverage instead of failing the case.
+const MAX_PASSES = 2;
 
 function shouldDisableModel(error: unknown): boolean {
   if (isRateLimitError(error)) return true;
@@ -357,7 +366,7 @@ export async function generateKit(input: GenerateKitInput): Promise<GenerateKitR
       drafts.push({
         ...q,
         category: job.category,
-        requirement_ids: q.requirement_ids.filter((id) => requirements.some((r) => r.id === id)),
+        requirement_ids: cleanRequirementIds(q.requirement_ids, requirements),
       });
     }
   }
@@ -367,16 +376,9 @@ export async function generateKit(input: GenerateKitInput): Promise<GenerateKitR
     drafts.splice(0, drafts.length, ...grounded);
   }
   {
-    const seen = new Set<string>();
-    const unique: typeof drafts = [];
-    for (const d of drafts) {
-      const key = d.prompt.trim().toLowerCase();
-      if (!seen.has(key)) {
-        seen.add(key);
-        unique.push(d);
-      }
-    }
-    if (unique.length !== drafts.length) warnings.push(`Deduplicated ${drafts.length - unique.length} identical questions.`);
+    const before = drafts.length;
+    const unique = dedupeDrafts(drafts);
+    if (unique.length !== before) warnings.push(`Deduplicated ${before - unique.length} identical questions.`);
     drafts.splice(0, drafts.length, ...unique);
   }
 
@@ -389,36 +391,37 @@ export async function generateKit(input: GenerateKitInput): Promise<GenerateKitR
     gapAttempts += 1;
     passes += 1;
     const missing = requirements.filter((r) => uncovered.includes(r.id));
-    // Bucket uncovered reqs by actual category so refills keep
-    // behavioural/technical/system-design/company-fit fidelity.
-    /** Map an uncovered requirement to the question category that owns it. */
-    const categoryForGapReq = (r: Req): QuestionCategory => {
-      if (r.kind === "behavioural") return "behavioural";
-      if (r.kind === "domain") return "company-fit";
-      return r.priority === "must" ? "system-design" : "technical";
-    };
-
+    // Bucket uncovered reqs by kind so refills keep
+    // behavioural/technical/company-fit fidelity. Chunked: no refill call
+    // ever carries more than the per-call question cap can cover.
     type GapJob = { category: QuestionCategory; batch: Req[]; label: string };
     const gapJobs: GapJob[] = (() => {
       const byCategory = new Map<QuestionCategory, Req[]>();
       for (const r of missing) {
-        const category = categoryForGapReq(r);
+        const category = categoryForRequirement(r);
         const list = byCategory.get(category);
         if (list) list.push(r);
         else byCategory.set(category, [r]);
       }
       // CATEGORIES order keeps refill deterministic across passes.
-      return CATEGORIES.filter((c) => byCategory.has(c)).map((category) => ({
-        category,
-        batch: byCategory.get(category)!,
-        label: `gap-pass-${gapAttempts}-${category}`,
-      }));
+      const jobs: GapJob[] = [];
+      for (const category of CATEGORIES.filter((c) => byCategory.has(c))) {
+        const chunks = chunkGapBatch(byCategory.get(category)!);
+        chunks.forEach((batch, i) => {
+          jobs.push({
+            category,
+            batch,
+            label: chunks.length > 1 ? `gap-pass-${gapAttempts}-${category}-${i + 1}` : `gap-pass-${gapAttempts}-${category}`,
+          });
+        });
+      }
+      return jobs;
     })();
     const gapModels = leaseModels(gapJobs.length, disabledModels);
     const gapResults = await withSignal(
       Promise.all(
         gapJobs.map((job, i) => {
-          const gapPrompt = questionsPrompt(job.category, job.batch, ctx);
+          const gapPrompt = questionsPrompt(job.category, job.batch, ctx, { gap: true });
           return llmRun(job.label, llmAttempts(job.label, gapPrompt, questionListSchema, LLM_TOKEN_LIMITS.GAP_PASS, gapModels[i])).then((res) => ({
             job,
             res,
@@ -434,24 +437,31 @@ export async function generateKit(input: GenerateKitInput): Promise<GenerateKitR
         drafts.push({
           ...q,
           category: job.category,
-          requirement_ids: q.requirement_ids.filter((id) => requirements.some((r) => r.id === id)),
+          requirement_ids: cleanRequirementIds(q.requirement_ids, requirements),
         });
       }
     }
     uncovered = findUncovered(requirements, draftRefs());
   }
 
+  drafts.splice(0, drafts.length, ...dedupeDrafts(drafts));
+
+  // Deterministic backstop: any must-have still uncovered after LLM passes
+  // gets a grounded template question (zero LLM calls). Invents no new
+  // skills — the prompt quotes the requirement text — so the kit ships with
+  // full must coverage instead of failing the case (spec Sections 4, 9 FAQ).
   {
-    const seen = new Set<string>();
-    const unique: typeof drafts = [];
-    for (const d of drafts) {
-      const key = d.prompt.trim().toLowerCase();
-      if (!seen.has(key)) {
-        seen.add(key);
-        unique.push(d);
-      }
+    const leftoverMusts = requirements.filter(
+      (r) => r.priority === "must" && findUncovered(requirements, draftRefs()).includes(r.id)
+    );
+    for (const r of leftoverMusts) {
+      drafts.push(backstopDraftFor(r, ctx.seniority));
     }
-    drafts.splice(0, drafts.length, ...unique);
+    if (leftoverMusts.length > 0) {
+      warnings.push(
+        `Coverage backstop wrote deterministic questions for uncovered must-haves: ${leftoverMusts.map((r) => r.id).join(", ")}; review recommended.`
+      );
+    }
   }
 
   const questions = drafts.map((d, i) => ({
@@ -485,7 +495,7 @@ export async function generateKit(input: GenerateKitInput): Promise<GenerateKitR
       id: `f${i + 1}`,
       front: f.front,
       back: f.back,
-      requirement_ids: f.requirement_ids.filter((id) => requirements.some((r) => r.id === id)),
+      requirement_ids: cleanRequirementIds(f.requirement_ids, requirements),
     }));
 
   progress("schedule", `${days}d, ${questions.length} qs`);
