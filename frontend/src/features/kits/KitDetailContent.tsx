@@ -8,9 +8,11 @@ import "react-day-picker/style.css";
 import type { KitAppendix, KitRequirement } from "@/lib/types";
 import { api } from "@/lib/api";
 import { formatDuration, cleanFocus } from "@/lib/format";
+import { LIMITS, textError } from "@/lib/validate";
 import { DIFFICULTY_LABELS } from "@/lib/kits";
 import { Badge } from "@/components/ui/Badge";
 import { Button, buttonStyles } from "@/components/ui/Button";
+import { FieldSelect } from "@/components/ui/Select";
 import { Card } from "@/components/ui/Card";
 import { DayQuestionDeck } from "./DayQuestionDeck";
 
@@ -24,6 +26,13 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "flashcards", label: "Flashcards" },
 ];
 
+/** Read the ?tab= param when it names a real tab, else fall back. */
+function initialTab<T extends string>(tabs: readonly { id: T }[], fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  const t = new URLSearchParams(window.location.search).get("tab");
+  return tabs.some((x) => x.id === t) ? (t as T) : fallback;
+}
+
 const CATEGORY_ACCENT: Record<string, string> = {
   technical: "bg-[#5b5bf5]",
   behavioural: "bg-[#ff7eb0]",
@@ -31,16 +40,47 @@ const CATEGORY_ACCENT: Record<string, string> = {
   "company-fit": "bg-[#10b981]",
 };
 
+const KIND_OPTIONS = [
+  { value: "technical", label: "Technical" },
+  { value: "behavioural", label: "Behavioural" },
+  { value: "domain", label: "Domain" },
+];
+
+const PRIORITY_OPTIONS = [
+  { value: "must", label: "Must-have" },
+  { value: "nice", label: "Nice-to-have" },
+];
+
 export function KitDetailContent({
   appendix,
   kitId,
+  createdAt,
   onChanged,
 }: {
   appendix: KitAppendix;
   kitId: string;
+  createdAt: string;
   onChanged: () => Promise<void>;
 }) {
-  const [tab, setTab] = useState<TabId>("overview");
+  const [tab, setTab] = useState<TabId>(() => initialTab(TABS, "overview"));
+
+  // Deep-link tabs: ?tab=questions. replaceState avoids navigation + Suspense needs.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("tab") !== tab) {
+      url.searchParams.set("tab", tab);
+      window.history.replaceState(null, "", url);
+    }
+  }, [tab]);
+
+  useEffect(() => {
+    const onPop = () => {
+      const next = initialTab(TABS, "overview");
+      setTab(next);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
   const [reqFilter, setReqFilter] = useState<"all" | "must" | "nice">("all");
   const [reqSearch, setReqSearch] = useState("");
   const [showAddReq, setShowAddReq] = useState(false);
@@ -211,21 +251,45 @@ export function KitDetailContent({
                     <p className="text-[11px] font-semibold tracking-[0.12em] text-[#a0a6c2] uppercase">
                       Sources · {appendix.company_brief.sources.length}
                     </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {appendix.company_brief.sources.slice(0, 6).map((src) => (
-                        <a
-                          key={src}
-                          href={src}
-                          target="_blank"
-                          rel="noreferrer"
-                          title={src}
-                          className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#e6e8f2] bg-[#f6f7fb] px-3 py-1.5 text-xs font-medium text-[#4f46e5] hover:border-[#c4b5fd] hover:bg-[#eef0ff] transition-colors"
-                        >
-                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#5b5bf5]" />
-                          <span className="truncate">{domainOf(src)}</span>
-                        </a>
+                    <ol className="mt-3 space-y-1.5">
+                      {appendix.company_brief.sources.map((src, i) => (
+                        <li key={`${src}-${i}`}>
+                          <a
+                            href={src}
+                            target="_blank"
+                            rel="noreferrer"
+                            title={src}
+                            className="group flex min-w-0 items-start gap-2.5 rounded-xl border border-[#e6e8f2] bg-[#f6f7fb] px-3 py-2 transition-colors hover:border-[#c4b5fd] hover:bg-[#eef0ff]"
+                          >
+                            <span className="mt-0.5 shrink-0 rounded-md bg-[#eef0ff] px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-[#4f46e5] group-hover:bg-white">
+                              {i + 1}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-xs font-semibold text-[#0b1220]">
+                                {domainOf(src)}
+                              </span>
+                              <span className="block break-all text-[11px] leading-relaxed text-[#67708f]">
+                                {pathOf(src)}
+                              </span>
+                            </span>
+                            <svg
+                              aria-hidden
+                              className="mt-1 h-3.5 w-3.5 shrink-0 text-[#a0a6c2] group-hover:text-[#4f46e5]"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                              />
+                            </svg>
+                          </a>
+                        </li>
                       ))}
-                    </div>
+                    </ol>
                   </div>
                 )}
               </div>
@@ -486,6 +550,7 @@ export function KitDetailContent({
             totalMinutes={totalMinutes}
             questionById={questionById}
             kitId={kitId}
+            createdAt={createdAt}
           />
         )}
 
@@ -515,7 +580,6 @@ export function KitDetailContent({
                     <span className="text-[10px] font-bold text-[#a0a6c2] uppercase tracking-wider tabular-nums">
                       Card {i + 1}
                     </span>
-                    <span className="font-mono text-[10px] text-[#d6d9eb]">{fc.id}</span>
                   </div>
                   <p className="mt-2 text-sm font-semibold text-[#0b1220] leading-relaxed line-clamp-3 flex-none">
                     {fc.front}
@@ -523,18 +587,6 @@ export function KitDetailContent({
                   <p className="mt-3 text-xs text-[#67708f] leading-relaxed line-clamp-2 border-t border-[#e6e8f2] pt-3">
                     {fc.back}
                   </p>
-                  {fc.requirement_ids.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {fc.requirement_ids.slice(0, 3).map((rid) => (
-                        <span
-                          key={rid}
-                          className="rounded-md bg-[#eef0ff] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-[#4f46e5]"
-                        >
-                          {rid}
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
@@ -615,6 +667,7 @@ function RequirementTag({
   const [text, setText] = useState(req.text);
   const [kind, setKind] = useState(req.kind);
   const [priority, setPriority] = useState(req.priority);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (editing) return;
@@ -632,51 +685,59 @@ function RequirementTag({
     setText(req.text);
     setKind(req.kind);
     setPriority(req.priority);
+    setError(null);
     setEditing(false);
+  };
+
+  const trySave = () => {
+    const err = textError(text, "Requirement", LIMITS.requirement);
+    setError(err);
+    if (err) return;
+    void onSave({ text: text.trim(), kind, priority }).then(() => setEditing(false));
   };
 
   if (editing) {
     return (
       <div className="basis-full rounded-2xl border-2 border-[#c4b5fd]/60 bg-white p-3 shadow-sm space-y-2.5">
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          rows={2}
-          autoFocus
-          disabled={disabled}
-          aria-label="Requirement text"
-          className="w-full rounded-xl border border-[#e6e8f2] bg-[#f6f7fb] px-3 py-2 text-sm text-[#0b1220] focus:outline-none focus:ring-2 focus:ring-[#5b5bf5]/30"
-        />
+        <div>
+          <textarea
+            value={text}
+            onChange={(e) => {
+              setText(e.target.value);
+              if (error) setError(null);
+            }}
+            rows={2}
+            autoFocus
+            disabled={disabled}
+            aria-label="Requirement text"
+            aria-invalid={!!error}
+            className={`w-full rounded-xl border bg-[#f6f7fb] px-3 py-2 text-sm text-[#0b1220] focus:outline-none focus:ring-2 focus:ring-[#5b5bf5]/30 ${error ? "border-[#f87171]" : "border-[#e6e8f2]"}`}
+          />
+          {error && <p role="alert" className="mt-1 text-[11px] font-medium text-[#b91c1c]">{error}</p>}
+        </div>
         <div className="flex flex-col sm:flex-row gap-2">
-          <select
+          <FieldSelect
+            label="Kind"
             value={kind}
-            onChange={(e) => setKind(e.target.value)}
+            onChange={setKind}
+            options={KIND_OPTIONS}
             disabled={disabled}
-            aria-label="Kind"
-            className="flex-1 rounded-xl border border-[#e6e8f2] bg-white px-2.5 py-2 text-xs font-semibold text-[#0b1220]"
-          >
-            <option value="technical">Technical</option>
-            <option value="behavioural">Behavioural</option>
-            <option value="domain">Domain</option>
-          </select>
-          <select
+            className="flex-1"
+          />
+          <FieldSelect
+            label="Priority"
             value={priority}
-            onChange={(e) => setPriority(e.target.value)}
+            onChange={setPriority}
+            options={PRIORITY_OPTIONS}
             disabled={disabled}
-            aria-label="Priority"
-            className="flex-1 rounded-xl border border-[#e6e8f2] bg-white px-2.5 py-2 text-xs font-semibold text-[#0b1220]"
-          >
-            <option value="must">Must-have</option>
-            <option value="nice">Nice-to-have</option>
-          </select>
+            className="flex-1"
+          />
         </div>
         <div className="flex gap-2">
           <Button
             size="sm"
-            disabled={disabled || !text.trim() || !dirty}
-            onClick={() => {
-              void onSave({ text: text.trim(), kind, priority }).then(() => setEditing(false));
-            }}
+            disabled={disabled || !dirty}
+            onClick={trySave}
           >
             Save
           </Button>
@@ -769,46 +830,56 @@ function RequirementComposer({
   const [text, setText] = useState("");
   const [kind, setKind] = useState("technical");
   const [priority, setPriority] = useState("must");
+  const [error, setError] = useState<string | null>(null);
+
+  const tryAdd = () => {
+    const err = textError(text, "Requirement", LIMITS.requirement);
+    setError(err);
+    if (err) return;
+    void onAdd({ text: text.trim(), kind, priority });
+  };
 
   return (
     <div className="rounded-2xl border-2 border-dashed border-[#c4b5fd]/60 bg-[#fafbff] p-4 space-y-2.5">
       <p className="text-[11px] font-semibold tracking-[0.12em] text-[#5b5bf5] uppercase">
         New requirement
       </p>
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={2}
-        autoFocus
-        placeholder="e.g. 3+ years operating Postgres at scale"
-        disabled={disabled}
-        className="w-full rounded-xl border border-[#e6e8f2] bg-white px-3 py-2 text-sm text-[#0b1220] placeholder:text-[#a0a6c2] focus:outline-none focus:ring-2 focus:ring-[#5b5bf5]/30"
-      />
+      <div>
+        <textarea
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            if (error) setError(null);
+          }}
+          rows={2}
+          autoFocus
+          placeholder="e.g. 3+ years operating Postgres at scale"
+          disabled={disabled}
+          aria-invalid={!!error}
+          className={`w-full rounded-xl border bg-white px-3 py-2 text-sm text-[#0b1220] placeholder:text-[#a0a6c2] focus:outline-none focus:ring-2 focus:ring-[#5b5bf5]/30 ${error ? "border-[#f87171]" : "border-[#e6e8f2]"}`}
+        />
+        {error && <p role="alert" className="mt-1 text-[11px] font-medium text-[#b91c1c]">{error}</p>}
+      </div>
       <div className="flex flex-col sm:flex-row gap-2">
-        <select
+        <FieldSelect
+          label="Kind"
           value={kind}
-          onChange={(e) => setKind(e.target.value)}
+          onChange={setKind}
+          options={KIND_OPTIONS}
           disabled={disabled}
-          aria-label="Kind"
-          className="flex-1 rounded-xl border border-[#e6e8f2] bg-white px-2.5 py-2 text-xs font-semibold text-[#0b1220]"
-        >
-          <option value="technical">Technical</option>
-          <option value="behavioural">Behavioural</option>
-          <option value="domain">Domain</option>
-        </select>
-        <select
+          className="flex-1"
+        />
+        <FieldSelect
+          label="Priority"
           value={priority}
-          onChange={(e) => setPriority(e.target.value)}
+          onChange={setPriority}
+          options={PRIORITY_OPTIONS}
           disabled={disabled}
-          aria-label="Priority"
-          className="flex-1 rounded-xl border border-[#e6e8f2] bg-white px-2.5 py-2 text-xs font-semibold text-[#0b1220]"
-        >
-          <option value="must">Must-have</option>
-          <option value="nice">Nice-to-have</option>
-        </select>
+          className="flex-1"
+        />
       </div>
       <div className="flex gap-2">
-        <Button size="sm" disabled={disabled || !text.trim()} onClick={() => void onAdd({ text: text.trim(), kind, priority })}>
+        <Button size="sm" disabled={disabled} onClick={tryAdd}>
           Add requirement
         </Button>
         <Button size="sm" variant="secondary" disabled={disabled} onClick={onCancel}>
@@ -901,25 +972,34 @@ function ScheduleCalendar({
   totalMinutes,
   questionById,
   kitId,
+  createdAt,
 }: {
   appendix: KitAppendix;
   totalMinutes: number;
   questionById: Map<string, KitAppendix["questions"][number]>;
   kitId: string;
+  createdAt: string;
 }) {
-  const today = useMemo(() => {
-    const t = new Date();
-    return new Date(t.getFullYear(), t.getMonth(), t.getDate());
-  }, []);
+  // Anchor Day 1 to kit creation, not today: the interview date is fixed,
+  // remaining days are a countdown. Anchoring to today shifted every date
+  // forward one day per day.
+  const anchor = useMemo(() => {
+    const d = new Date(createdAt);
+    if (Number.isNaN(d.getTime())) {
+      const t = new Date();
+      return new Date(t.getFullYear(), t.getMonth(), t.getDate());
+    }
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }, [createdAt]);
 
   const dayByKey = useMemo(() => {
     const map = new Map<string, { day: ScheduleDay; date: Date }>();
     for (const d of appendix.schedule.days) {
-      const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + d.day - 1);
+      const date = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + d.day - 1);
       map.set(dateKey(date), { day: d, date });
     }
     return map;
-  }, [appendix.schedule.days, today]);
+  }, [appendix.schedule.days, anchor]);
 
   const studyDates = useMemo(() => [...dayByKey.values()].map((v) => v.date), [dayByKey]);
   // Interview lands the day after the last study session.
@@ -967,10 +1047,10 @@ function ScheduleCalendar({
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-5">
-        <Card className="p-3 sm:p-4 lg:col-span-3 overflow-x-auto">
+        <Card className="schedule-calendar p-3 sm:p-4 lg:col-span-3 overflow-x-auto">
           <DayPicker
             mode="single"
-            defaultMonth={today}
+            defaultMonth={anchor}
             selected={isInterviewSelected ? (interviewDate ?? undefined) : selected?.date}
             onSelect={(date) => {
               if (!date) return;
@@ -988,6 +1068,7 @@ function ScheduleCalendar({
               month: "w-full",
               month_caption: "flex items-center justify-between w-full",
               caption_label: "text-[15px] font-bold text-(--foreground)",
+              nav: "flex items-center gap-2",
               button_previous:
                 "grid h-8 w-8 place-items-center rounded-full border border-[#e6e8f2] bg-white text-[#67708f] transition-colors hover:text-[#0b1220]",
               button_next:
@@ -1003,7 +1084,13 @@ function ScheduleCalendar({
               <span className="h-2.5 w-2.5 rounded-md bg-[#eef0ff] border border-[#c4b5fd]/50" />
               Study day
             </span>
-            <span>Day 1 starts today</span>
+            <span>
+              Day 1 ·{" "}
+              {anchor.toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+              })}
+            </span>
             {interviewDate && (
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-2.5 w-2.5 rounded-md bg-gradient-to-br from-[#ff7eb0] to-[#ffcc6a]" />
@@ -1188,6 +1275,15 @@ function Chevron({ open }: { open: boolean }) {
   );
 }
 
+function pathOf(url: string): string {
+  try {
+    const u = new URL(url);
+    const path = `${u.pathname}${u.search}${u.hash}`;
+    return path && path !== "/" ? path : u.href.replace(/^https?:\/\//, "");
+  } catch {
+    return url;
+  }
+}
 function domainOf(url: string): string {
   try {
     return new URL(url).hostname.replace(/^www\./, "");

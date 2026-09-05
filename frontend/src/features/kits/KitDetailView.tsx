@@ -84,7 +84,7 @@ export function KitDetailView({ kitId }: { kitId: string }) {
         )}
 
         {appendix && kit.status === "done" && (
-          <KitDetailContent appendix={appendix} kitId={kitId} onChanged={refresh} />
+          <KitDetailContent appendix={appendix} kitId={kitId} createdAt={kit.createdAt} onChanged={refresh} />
         )}
       </div>
     </div>

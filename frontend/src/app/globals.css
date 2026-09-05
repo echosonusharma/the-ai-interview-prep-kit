@@ -325,6 +325,23 @@ html.dark .dashboard-name-shimmer, .dark .dashboard-name-shimmer {
   color: transparent;
 }
 
+/* — Schedule calendar: month label + pager share one row — */
+.schedule-calendar .rdp-months { position: relative; }
+.schedule-calendar .rdp-nav {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.schedule-calendar .rdp-month_caption {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding-right: 88px;
+}
+
 /* — Consistent focus treatment app-wide: theme accent, never browser black — */
 input:not([type="checkbox"]):not([type="radio"]):focus,
 textarea:focus,
