@@ -20,6 +20,9 @@ export function useAuthSubmit(action: () => Promise<void>) {
       await action();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Request failed");
+    } finally {
+      // Reset even on success: if post-login navigation fails or bounces,
+      // the form must not stay stuck in its pending state.
       setLoading(false);
     }
   };
