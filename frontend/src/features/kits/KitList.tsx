@@ -114,9 +114,6 @@ export function KitList({
   }, [searchParams]);
 
   const controlled = kitsProp !== undefined;
-  // Server owns sort + paging for the uncontrolled list; controlled lists
-  // (dashboard) render preloaded kits as given. Locally removed kits are
-  // filtered in both modes so delete feels instant.
   const visible = (controlled ? (limit ? kitsProp.slice(0, limit) : kitsProp) : kitsInternal).filter(
     (k) => !removedIds.includes(k.id)
   );

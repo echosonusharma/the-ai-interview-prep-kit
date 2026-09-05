@@ -13,9 +13,8 @@ interface DeleteKitButtonProps {
 }
 
 /**
- * Two-click delete: first click arms ("Confirm?"), second click deletes.
- * Queued/running kits are blocked server-side (409) so the button stays
- * disabled until generation settles.
+ * Two-click delete: first click arms, second confirms. Queued/running kits
+ * stay disabled (server 409s them until generation settles).
  */
 export function DeleteKitButton({ kitId, status, variant = "icon", onDeleted }: DeleteKitButtonProps) {
   const [armed, setArmed] = useState(false);

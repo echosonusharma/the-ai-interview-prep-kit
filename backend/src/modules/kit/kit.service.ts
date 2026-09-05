@@ -5,6 +5,7 @@ import { Kit } from "../../models/kit.model.js";
 import type { IKit } from "../../types/kit.types.js";
 import type { KitAppendix } from "../../validators/kit.validator.js";
 import { validateKitDocument } from "../../validators/kit.validator.js";
+import { GATE_REJECTION_PREFIX } from "../../pipeline/steps/gate.js";
 import { generateKit } from "../../pipeline/steps/orchestrator.js";
 import { env } from "../../config/env.js";
 import { hashKitInput } from "../../utils/jd-hash.js";
@@ -17,7 +18,9 @@ import { serializeKitDetail } from "./kit.serializer.js";
 function errorCode(message: string): string {
   if (/timed out after/i.test(message)) return "CASE_TIMEOUT";
   if (/unreachable|enotfound|econn|timeout|fetch failed/i.test(message)) return "COMPANY_UNREACHABLE";
-  if (/validat/i.test(message)) return "VALIDATION_FAILED";
+  // Exact gate prefix only — late-pipeline "validation" wording signals
+  // pipeline bugs, so those fall through to PIPELINE_FAILED.
+  if (message.startsWith(GATE_REJECTION_PREFIX)) return "VALIDATION_FAILED";
   if (/coverage incomplete/i.test(message)) return "COVERAGE_FAILED";
   if (/budget/i.test(message)) return "LLM_FAILED";
   return "PIPELINE_FAILED";
@@ -409,8 +412,7 @@ export async function getKitForOwner(kitId: string, ownerId: string): Promise<IK
 
 /**
  * Delete a kit owned by the user. Queued/running kits are rejected: the worker
- * holds the document in memory and its terminal save() would resurrect a
- * deleted row. Delete only after generation settles (done/failed).
+ * holds the document and its terminal save() would resurrect a deleted row.
  */
 export async function deleteKitForOwner(kitId: string, ownerId: string): Promise<void> {
   const kit = await Kit.findOne({ _id: kitId, owner: ownerId });

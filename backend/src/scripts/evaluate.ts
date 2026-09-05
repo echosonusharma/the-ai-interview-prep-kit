@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { z } from "zod";
 import { generateKit } from "../pipeline/steps/orchestrator.js";
+import { GATE_REJECTION_PREFIX } from "../pipeline/steps/gate.js";
 import { describeProviders, env } from "../config/env.js";
 import pc from "picocolors";
 import { logStyle as s } from "../pipeline/log.js";
@@ -16,7 +17,7 @@ const inputSchema = z.array(caseSchema);
 function errorCode(message: string): string {
   if (/timed out after/i.test(message)) return "CASE_TIMEOUT";
   if (/unreachable|enotfound|econn|timeout|fetch failed/i.test(message)) return "COMPANY_UNREACHABLE";
-  if (/validat/i.test(message)) return "VALIDATION_FAILED";
+  if (message.startsWith(GATE_REJECTION_PREFIX)) return "VALIDATION_FAILED";
   if (/coverage incomplete/i.test(message)) return "COVERAGE_FAILED";
   if (/budget/i.test(message)) return "LLM_FAILED";
   return "PIPELINE_FAILED";

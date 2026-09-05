@@ -1,10 +1,15 @@
 import { z } from "zod";
 import { PROMPTS } from "../prompts/index.js";
 
-/** Minimum JD length the gate accepts — mirrors the "50+ chars" UI hint. */
+// errorCode() matches this prefix for VALIDATION_FAILED — keep stable.
+export const GATE_REJECTION_PREFIX = "Input validation failed: ";
+
+export function gateError(reason: string): Error {
+  return new Error(`${GATE_REJECTION_PREFIX}${reason}`);
+}
+
 export const GATE_MIN_JD_CHARS = 50;
 
-/** Minimum distinct job-signal hits for the JD to read as a posting. */
 const MIN_JOB_SIGNALS = 2;
 
 const JOB_SIGNALS = [
@@ -26,20 +31,16 @@ const JOB_SIGNALS = [
   /must have|nice-?to-?have|\bplus\b/i,
 ];
 
-// Hard-fail without spending an LLM call. Tight patterns only — ambiguous
-// cases go to the model verdict, which can weigh context.
+// Tight patterns only — ambiguous cases go to the model verdict.
 const STRONG_INJECTION = [
   /ignor(e|ing)\s+(all\s+)?(previous|prior|above|preceding)\s+(instructions?|prompts?|rules?)/i,
   /disregard\s+(all\s+)?(previous|prior|above|preceding).{0,30}(instructions?|rules?)/i,
   /reveal\s+(your|the)\s+(system|prompt|instructions?)/i,
-  /forget\s+all\s+. {0,20}instructions?/i,
+  /forget\s+all\s+.{0,20}?instructions?/i,
   /jailbreak/i,
 ];
 
-/**
- * Free deterministic pre-check. Returns a user-facing fail reason, or null
- * when the input deserves the (paid) model verdict.
- */
+// Free pre-check. Returns a fail reason, or null when the input deserves the paid verdict.
 export function deterministicGate(jd: string, _companyUrl: string): string | null {
   const normalized = jd.replace(/\s+/g, " ").trim();
   if (normalized.length < GATE_MIN_JD_CHARS) {
@@ -59,24 +60,28 @@ export const gateSchema = z.object({
   is_job_posting: z.boolean(),
   url_matches_jd: z.boolean(),
   injection_detected: z.boolean(),
-  reason: z.string().trim().max(300).default(""),
+  reason: z.preprocess(
+    (v) => (typeof v === "string" ? v : ""),
+    z.string().transform((s) => s.trim().slice(0, 300))
+  ),
 });
 
 export type GateVerdict = z.infer<typeof gateSchema>;
 
-/**
- * Neutralize `</TAG>` collisions so untrusted text can't break out of
- * `<DATA>...</DATA>` prompt framing. The zero-width space keeps the text
- * human-readable while breaking exact closing-tag matches.
- * (Duplicated per step file — steps never import from each other.)
- */
+// Break `</TAG>` collisions so untrusted text can't escape `<DATA>` framing.
 function escapeUntrusted(text: string): string {
   return text.replace(/<\//g, "<\u200b/");
 }
 
 export function gatePrompt(jd: string, companyUrl: string): { system: string; user: string } {
+  // Head + tail so long preambles don't hide responsibilities from the model.
+  const normalized = jd.replace(/\s+/g, " ").trim();
+  const excerpt =
+    normalized.length <= 2000
+      ? normalized
+      : `${normalized.slice(0, 1200)}\n…[truncated]…\n${normalized.slice(-800)}`;
   return {
     system: PROMPTS.gate,
-    user: `<DATA jd>\n${escapeUntrusted(jd.slice(0, 2000))}\n</DATA>\n<DATA company_url>\n${escapeUntrusted(companyUrl.slice(0, 500))}\n</DATA>`,
+    user: `<DATA jd>\n${escapeUntrusted(excerpt)}\n</DATA>\n<DATA company_url>\n${escapeUntrusted(companyUrl.slice(0, 500))}\n</DATA>`,
   };
 }

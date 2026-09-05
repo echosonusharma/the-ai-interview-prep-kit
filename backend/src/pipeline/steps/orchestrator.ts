@@ -26,7 +26,7 @@ import {
   type QuestionDraft,
 } from "./questions.js";
 import { flashcardListSchema, flashcardsPrompt, type FlashcardDraft } from "./flashcards.js";
-import { deterministicGate, gatePrompt, gateSchema } from "./gate.js";
+import { deterministicGate, gateError, gatePrompt, gateSchema } from "./gate.js";
 import type { IKitRequirement } from "../../types/kit.types.js";
 
 export interface GenerateKitInput {
@@ -194,13 +194,11 @@ export async function generateKit(input: GenerateKitInput): Promise<GenerateKitR
   progress("gate", "validating input");
   throwIfAborted(signal, "gate");
 
-  // Step 0: reject junk before spending crawl + LLM budget. Deterministic
-  // checks are free; the model verdict costs one cheap JSON call. Failures
-  // throw with a "validation" message so runKitGeneration maps them to
-  // VALIDATION_FAILED and the user sees the reason on the kit page.
+  // Step 0: reject junk before spending crawl + LLM budget. Failures throw
+  // with the gate prefix so runKitGeneration maps them to VALIDATION_FAILED.
   const gateFail = deterministicGate(input.jd, input.companyUrl);
   if (gateFail) {
-    throw new Error(`Input validation failed: ${gateFail}`);
+    throw gateError(gateFail);
   }
   const [gateModel] = leaseModelsForSteps(["gate"], disabledModels);
   const gateRes = await withSignal(
@@ -214,13 +212,13 @@ export async function generateKit(input: GenerateKitInput): Promise<GenerateKitR
   provenance.gate = gateRes.provenance;
   const verdict = gateRes.value;
   if (verdict.injection_detected) {
-    throw new Error(
-      `Input validation failed: prompt-injection patterns detected in job description${verdict.reason ? ` (${verdict.reason})` : ""}`
+    throw gateError(
+      `prompt-injection patterns detected in job description${verdict.reason ? ` (${verdict.reason})` : ""}`
     );
   }
   if (!verdict.is_job_posting) {
-    throw new Error(
-      `Input validation failed: input doesn't read as a job posting${verdict.reason ? ` (${verdict.reason})` : ""}`
+    throw gateError(
+      `input doesn't read as a job posting${verdict.reason ? ` (${verdict.reason})` : ""}`
     );
   }
   if (!verdict.url_matches_jd) {

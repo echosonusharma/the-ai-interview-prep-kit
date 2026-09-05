@@ -1,7 +1,6 @@
 import { z } from "zod";
 
-// Request validation schemas for HTTP intake. Service + Mongoose checks stay as
-// defense in depth; these reject malformed bodies/query/params early with 400.
+// HTTP intake schemas. Service + Mongoose checks remain as defense in depth.
 
 const objectIdParam = z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid id");
 const subId = z.string().min(1).max(64);
@@ -20,10 +19,11 @@ const httpUrl = z
     }
   }, "Invalid company URL");
 
-const days = z.number().int().min(1).max(60);
+const days = z.preprocess(
+  (v) => (v === null || v === undefined || v === "" ? undefined : v),
+  z.coerce.number().int().min(1).max(60).default(5)
+);
 const requirementIds = z.array(subId).max(50);
-const nonEmptyPatch = (msg = "At least one field is required") =>
-  z.record(z.string(), z.unknown()).refine((o) => Object.keys(o).length > 0, msg);
 
 // Auth
 export const signupBody = z.object({
@@ -37,35 +37,30 @@ export const loginBody = z.object({
   password: z.string().min(1).max(72),
 });
 
-// Kit create
-const kitCase = z.object({
-  rawJd: z.string().trim().min(10, "Job description must be at least 10 characters").max(100000),
+// rawJd floor 50 matches the gate and the "50+ chars" UI hint.
+export const kitCase = z.object({
+  rawJd: z.string().trim().min(50, "Job description must be at least 50 characters").max(100000),
   companyUrl: httpUrl,
-  days: days.default(5),
+  days,
 });
 
 export const createKitBody = z.object({
-  rawJd: z.string().trim().min(10, "Job description must be at least 10 characters").max(100000),
+  rawJd: z.string().trim().min(50, "Job description must be at least 50 characters").max(100000),
   companyUrl: httpUrl,
-  days: days.default(5),
+  days,
 });
 
+// Loose per case — the controller folds bad cases into errors[], not a whole-request 400.
 export const createKitBatchBody = z.object({
-  cases: z.array(kitCase).min(1, "cases array is required").max(20, "Maximum 20 cases per batch"),
+  cases: z.array(z.record(z.string(), z.unknown())).min(1, "cases array is required").max(20, "Maximum 20 cases per batch"),
 });
 
-// Builder: brief
-export const briefPatchBody = z
-  .object({
-    summary: z.string().trim().min(1).max(10000).optional(),
-    what_they_do: z.string().trim().min(1).max(10000).optional(),
-    pinned: z.boolean().optional(),
-  })
-  .superRefine((o, ctx) => {
-    if (Object.keys(o).length === 0) {
-      ctx.addIssue({ code: "custom", message: "At least one field is required" });
-    }
-  });
+// Brief allows {} (pins the brief, matching updateBrief).
+export const briefPatchBody = z.object({
+  summary: z.string().trim().min(1).max(10000).optional(),
+  what_they_do: z.string().trim().min(1).max(10000).optional(),
+  pinned: z.boolean().optional(),
+});
 
 // Builder: questions
 const questionCategory = z.enum(["technical", "behavioural", "system-design", "company-fit"]);
@@ -163,19 +158,32 @@ export const regenParams = z.object({
 
 // Query
 const sortEnum = z.enum(["newest", "oldest", "upcoming"]).default("newest").catch("newest");
-const statusEnum = z.enum(["queued", "running", "done", "failed", "active"]).optional();
+// Unknown/empty status returns the unfiltered list.
+const statusFilter = z.preprocess(
+  (v) => (v === "" ? undefined : v),
+  z.string().trim().max(200).optional().catch(undefined)
+);
+
+// Floor numerics so ?page=2.9 means page 2.
+const pageNum = (max: number, fallback: number) =>
+  z.preprocess(
+    (v) => {
+      if (v === null || v === undefined || v === "") return undefined;
+      const n = typeof v === "number" ? v : Number(v);
+      return Number.isFinite(n) ? Math.floor(n) : v;
+    },
+    z.number().int().min(1).max(max).default(fallback).catch(fallback)
+  );
 
 export const listKitsQuery = z.object({
-  page: z.coerce.number().int().min(1).max(10000).default(1).catch(1),
-  limit: z.coerce.number().int().min(1).max(50).default(50).catch(50),
+  page: pageNum(10000, 1),
+  limit: pageNum(50, 50),
   sort: sortEnum,
-  status: statusEnum,
+  status: statusFilter,
   q: z.string().trim().max(200).optional(),
 });
 
 export const dashboardQuery = z.object({
-  page: z.coerce.number().int().min(1).max(10000).default(1).catch(1),
-  limit: z.coerce.number().int().min(1).max(20).default(5).catch(5),
+  page: pageNum(10000, 1),
+  limit: pageNum(20, 5),
 });
-
-export { nonEmptyPatch };

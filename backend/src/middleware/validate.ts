@@ -8,9 +8,8 @@ interface ValidateSchemas {
 }
 
 /**
- * Validate body/query/params against zod schemas. On failure responds 400 with
- * { error, details } and never calls next. On success replaces the request
- * property with parsed (coerced/trimmed/defaulted) data.
+ * Validate body/query/params against zod schemas. 400s with { error, details }
+ * on failure; replaces each property with parsed data on success.
  */
 export function validate(schemas: ValidateSchemas) {
   return (req: Request, res: Response, next: NextFunction): void => {

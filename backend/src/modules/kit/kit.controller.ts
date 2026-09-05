@@ -26,6 +26,7 @@ import {
 import { getPracticeDeck, recordFlashcardReview } from "./kit-practice.service.js";
 import { regenerateSection, type RegenSection } from "./kit-regenerate.service.js";
 import { serializeKitSummary, serializeKitDetail } from "./kit.serializer.js";
+import { kitCase } from "../../validators/http.validator.js";
 import { kickKitWorker } from "./kit.queue.js";
 import { kitEvents, type KitEvent, type KitEventPayload, type KitEventType } from "./kit.events.js";
 
@@ -61,20 +62,30 @@ async function respondKit(res: Response, kit: Awaited<ReturnType<typeof loadKit>
 }
 
 export async function createKitBatchHandler(req: Request, res: Response): Promise<void> {
-  // Body shape (cases 1..20, each with rawJd/companyUrl/days) is enforced by
-  // validate({ body: createKitBatchBody }); per-case failures surface via
-  // createKitBatch errors so one bad case doesn't fail the whole batch.
-  const { cases } = req.body as {
-    cases: Array<{ rawJd: string; companyUrl: string; days: number }>;
-  };
-  const { created, errors } = await createKitBatch(
-    req.session.userId!,
-    cases.map((c) => ({
-      rawJd: c.rawJd,
-      companyUrl: c.companyUrl,
-      days: c.days,
-    }))
-  );
+  // One bad case lands in errors[], not a whole-request 400.
+  const { cases } = req.body as { cases: Array<Record<string, unknown>> };
+  const validInputs: Array<{ rawJd: string; companyUrl: string; days: number }> = [];
+  const validIndexes: number[] = [];
+  const errors: Array<{ index: number; message: string; statusCode: number }> = [];
+  cases.forEach((c, index) => {
+    const parsed = kitCase.safeParse(c);
+    if (!parsed.success) {
+      const first = parsed.error.issues[0];
+      errors.push({
+        index,
+        message: first ? `${first.path.join(".") || "case"}: ${first.message}` : "Invalid case",
+        statusCode: 400,
+      });
+      return;
+    }
+    validInputs.push(parsed.data);
+    validIndexes.push(index);
+  });
+  const { created, errors: serviceErrors } = await createKitBatch(req.session.userId!, validInputs);
+  for (const e of serviceErrors) {
+    errors.push({ ...e, index: validIndexes[e.index] ?? e.index });
+  }
+  errors.sort((a, b) => a.index - b.index);
   // Only wake the worker when there is actually queued work.
   if (created.length > 0) kickKitWorker();
   const kits = await Promise.all(
@@ -84,7 +95,6 @@ export async function createKitBatchHandler(req: Request, res: Response): Promis
 }
 
 export async function createKitHandler(req: Request, res: Response): Promise<void> {
-  // rawJd/companyUrl/days shape enforced by validate({ body: createKitBody }).
   const { rawJd, companyUrl, days } = req.body as {
     rawJd: string;
     companyUrl: string;
@@ -100,7 +110,6 @@ export async function createKitHandler(req: Request, res: Response): Promise<voi
 }
 
 export async function listKitsHandler(req: Request, res: Response): Promise<void> {
-  // Query coerced/defaulted by validate({ query: listKitsQuery }).
   const { page, limit, sort, status, q: search } = req.query as unknown as {
     page: number;
     limit: number;
@@ -118,7 +127,6 @@ export async function listKitsHandler(req: Request, res: Response): Promise<void
 }
 
 export async function getDashboardHandler(req: Request, res: Response): Promise<void> {
-  // Query coerced/defaulted by validate({ query: dashboardQuery }).
   const { page, limit } = req.query as unknown as { page: number; limit: number };
   res.json(await getDashboardSummary(req.session.userId!, page, limit));
 }
@@ -380,7 +388,6 @@ export async function postPracticeReviewHandler(req: Request, res: Response): Pr
     res.status(404).json({ error: "Kit not found" });
     return;
   }
-  // flashcardId/confidence shape enforced by validate({ body: practiceReviewBody }).
   const { flashcardId, confidence } = req.body as { flashcardId: string; confidence: 1 | 2 | 3 | 4 | 5 };
   const updated = await recordFlashcardReview(kit, flashcardId, confidence);
   res.json(getPracticeDeck(updated));
