@@ -104,7 +104,7 @@ export function DashboardHero({
             mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
           }`}
         >
-          Turn any job description into a tailored prep kit — company research, questions, flashcards, and a
+          Turn any job description into a tailored prep kit: company research, questions, flashcards, and a
           day-by-day schedule.
         </p>
 

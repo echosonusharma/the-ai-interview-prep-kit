@@ -1,6 +1,6 @@
 /** Human-friendly durations. Raw minutes stay backend-internal. */
 export function formatDuration(totalMinutes: number): string {
-  if (!Number.isFinite(totalMinutes) || totalMinutes < 0) return "—";
+  if (!Number.isFinite(totalMinutes) || totalMinutes < 0) return "-";
   const mins = Math.round(totalMinutes);
   if (mins < 60) return `${mins}m`;
   const h = Math.floor(mins / 60);

@@ -51,7 +51,7 @@ export function UpcomingInterviews({
             {loading || !data
               ? "Loading…"
               : pagination.total === 0
-                ? "Nothing on the calendar — create a kit to get started"
+                ? "Nothing on the calendar. Create a kit to get started"
                 : `${pagination.total} upcoming, soonest first`}
           </p>
         </div>
@@ -98,7 +98,7 @@ export function UpcomingInterviews({
       ) : upcoming.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-[#d6d9eb] bg-white p-8 text-center">
           <p className="text-sm font-semibold text-[#0b1220]">No upcoming interviews</p>
-          <p className="mt-1 text-sm text-[#67708f]">Past interviews fall off here — new kits show up soonest-first.</p>
+          <p className="mt-1 text-sm text-[#67708f]">Past interviews fall off here. New kits show up soonest-first.</p>
         </div>
       ) : (
         <div

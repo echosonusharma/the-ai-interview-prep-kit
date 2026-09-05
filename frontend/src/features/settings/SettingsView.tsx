@@ -22,7 +22,7 @@ const FAQS: Array<{ q: string; a: string }> = [
   },
   {
     q: "What is the coverage second pass?",
-    a: "After the first draft, every requirement is checked against the generated questions. Any must-have with no covering question is sent back for another generation round, and the check runs again — so kits don't ship with uncovered must-haves.",
+    a: "After the first draft, every requirement is checked against the generated questions. Any must-have with no covering question is sent back for another generation round, and the check runs again, so kits don't ship with uncovered must-haves.",
   },
   {
     q: "Will regenerating a section wipe my edits?",
@@ -34,11 +34,11 @@ const FAQS: Array<{ q: string; a: string }> = [
   },
   {
     q: "How is the study schedule allocated?",
-    a: "Deterministically in code, not by the model: your material is spread across exactly the number of days you asked for, with harder and higher-priority material placed earlier — never crammed into the night before.",
+    a: "Deterministically in code, not by the model: your material is spread across exactly the number of days you asked for, with harder and higher-priority material placed earlier. Never crammed into the night before.",
   },
   {
     q: "Can I prepare for several roles at once?",
-    a: "Yes — use Batch upload on the kits page with a JSON file of { jd, company_url, days } objects. Each case generates independently, and one failure never aborts the rest.",
+    a: "Yes. Use Batch upload on the kits page with a JSON file of { jd, company_url, days } objects. Each case generates independently, and one failure never aborts the rest.",
   },
   {
     q: "What if the company site is unreachable or the JD is tiny?",
@@ -165,12 +165,12 @@ export default function SettingsView() {
               </Row>
               <Row label="Name">
                 <p className="rounded-xl border border-[#e6e8f2] bg-[#f6f7fb] px-3.5 py-2.5 text-sm font-semibold text-[#0b1220]">
-                  {user?.name?.trim() || "—"}
+                  {user?.name?.trim() || "-"}
                 </p>
               </Row>
               <Row label="Email" hint="Used for sign-in.">
                 <p className="rounded-xl border border-[#e6e8f2] bg-[#f6f7fb] px-3.5 py-2.5 text-sm font-semibold text-[#0b1220]">
-                  {user?.email ?? "—"}
+                  {user?.email ?? "-"}
                 </p>
               </Row>
               <div className="flex justify-end gap-2 py-5">

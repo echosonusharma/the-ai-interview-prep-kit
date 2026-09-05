@@ -89,7 +89,7 @@ export default function PracticeView() {
           </div>
           <h2 className="relative mt-3 text-base font-extrabold text-[#0b1220]">No decks yet</h2>
           <p className="relative mx-auto mt-1 max-w-sm text-sm text-[#67708f]">
-            Complete a kit first, then practice its flashcards here — weakest cards surface first.
+            Complete a kit first, then practice its flashcards here. Weakest cards surface first.
           </p>
           <Link href="/kits/new" className="relative mt-5 inline-block">
             <Button>Create a kit</Button>

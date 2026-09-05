@@ -65,7 +65,7 @@ export function KitPracticeView({ kitId }: { kitId: string }) {
     setFlipped(false);
   }, [kitId]);
 
-  // True local restart: fresh session from card 1 (server progress is kept —
+  // True local restart: fresh session from card 1 (server progress is kept -
   // there is no reset endpoint, so reviewed counts stay honest).
   const restart = useCallback(async () => {
     if (restarting) return;
@@ -116,7 +116,7 @@ export function KitPracticeView({ kitId }: { kitId: string }) {
 
   const flip = useCallback(() => setFlipped((f) => !f), []);
 
-  // Focus mode: fullscreen ONLY the deck wrapper — sidebar/topbar disappear,
+  // Focus mode: fullscreen ONLY the deck wrapper - sidebar/topbar disappear,
   // just the card (+ rating controls) centered on screen.
   const toggleFullscreen = useCallback(async () => {
     try {
@@ -126,7 +126,7 @@ export function KitPracticeView({ kitId }: { kitId: string }) {
         await deckWrapRef.current?.requestFullscreen();
       }
     } catch {
-      // Fullscreen unavailable (e.g. embedded iframe) — stay in normal view
+      // Fullscreen unavailable (e.g. embedded iframe) - stay in normal view
     }
   }, []);
 
@@ -301,7 +301,7 @@ export function KitPracticeView({ kitId }: { kitId: string }) {
           <button
             type="button"
             onClick={() => void toggleFullscreen()}
-            title={isFullscreen ? "Exit focus mode (F)" : "Focus mode — card only (F)"}
+            title={isFullscreen ? "Exit focus mode (F)" : "Focus mode: card only (F)"}
             aria-label={isFullscreen ? "Exit focus mode" : "Enter focus mode"}
             aria-pressed={isFullscreen}
             className="focus-ring inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#e6e8f2] bg-white px-3 py-1.5 text-xs font-bold text-[#67708f] shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#a5b4fc] hover:text-[#4f46e5] hover:shadow-md"
@@ -420,7 +420,7 @@ export function KitPracticeView({ kitId }: { kitId: string }) {
                         >
                           {unseen ? (
                             <>
-                              <Sparkles size={11} aria-hidden /> NEW — worth +50 XP
+                              <Sparkles size={11} aria-hidden /> NEW: worth +50 XP
                             </>
                           ) : (
                             `Last: ${p?.confidence}/5 · seen ${p?.attempts}×`

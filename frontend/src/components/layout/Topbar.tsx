@@ -31,12 +31,12 @@ export function Topbar({
       setSigningOut(false);
     }
   };
-  // Kits hub has its own search box — hide the global one there to avoid duplicates.
+  // Kits hub has its own search box - hide the global one there to avoid duplicates.
   const onKitsPage = pathname?.startsWith("/kits") ?? false;
   const [value, setValue] = useState("");
   const [tooShort, setTooShort] = useState(false);
 
-  // Fires only on Enter with 4+ chars — deep-links to the kits hub search.
+  // Fires only on Enter with 4+ chars - deep-links to the kits hub search.
   const submit = () => {
     const q = value.trim();
     if (q.length < MIN_QUERY) {
@@ -82,7 +82,7 @@ export function Topbar({
         </Link>
       </div>
 
-      {/* Center — global kit search (hidden on kits pages, they have their own) */}
+      {/* Center - global kit search (hidden on kits pages, they have their own) */}
       {!onKitsPage && (
       <form
         className="hidden min-w-0 flex-1 justify-center md:flex"

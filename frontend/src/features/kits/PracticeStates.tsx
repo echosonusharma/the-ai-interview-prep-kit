@@ -58,7 +58,7 @@ export function CompleteState({
             <div className="text-[10px] font-bold uppercase tracking-widest text-[#a0a6c2]">Streak</div>
           </div>
           <div className="rounded-2xl bg-[#f6f7fb] p-3">
-            <div className="text-lg font-extrabold text-[#0b1220]">{accuracy != null ? `${accuracy}%` : "—"}</div>
+            <div className="text-lg font-extrabold text-[#0b1220]">{accuracy != null ? `${accuracy}%` : "-"}</div>
             <div className="text-[10px] font-bold uppercase tracking-widest text-[#a0a6c2]">Ace rate</div>
           </div>
         </div>

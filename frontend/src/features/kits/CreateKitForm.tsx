@@ -68,7 +68,7 @@ export function CreateKitForm() {
           days: typeof c.days === "number" ? c.days : 5,
         }))
         .filter((c) => c.rawJd.trim() && c.companyUrl.trim());
-      if (cases.length === 0) throw new Error("No valid rows — each needs jd and company_url");
+      if (cases.length === 0) throw new Error("No valid rows: each needs jd and company_url");
       const { kits, errors } = await api.createKitBatch(cases);
       if (kits.length === 0) {
         setError(errors.map((e) => `#${e.index}: ${e.message}`).join("; ") || "No kits created");
@@ -99,7 +99,7 @@ export function CreateKitForm() {
           </span>
           <div>
             <h2 className="text-lg font-extrabold tracking-tight text-[#0b1220]">Create interview prep kit</h2>
-            <p className="text-xs text-[#67708f]">Paste a JD + company URL — research runs itself.</p>
+            <p className="text-xs text-[#67708f]">Paste a JD + company URL. Research runs itself.</p>
           </div>
         </div>
 

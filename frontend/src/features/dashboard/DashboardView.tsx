@@ -32,7 +32,7 @@ export default function DashboardView() {
     try {
       setSummary(await api.getDashboard(p, UPCOMING_PAGE_SIZE));
     } catch {
-      // Backend stats are progressive enhancement — hero falls back to local counts
+      // Backend stats are progressive enhancement - hero falls back to local counts
       setSummary(null);
     } finally {
       setSummaryLoading(false);
@@ -54,7 +54,7 @@ export default function DashboardView() {
           <div>
             <h2 className="text-lg font-bold text-[#0b1220]">Your kits</h2>
             <p className="text-sm text-[#67708f] mt-0.5">
-              {loading ? "Loading…" : kits.length === 0 ? "No kits yet — create one to get started" : `${kits.length} role${kits.length === 1 ? "" : "s"} in your library`}
+              {loading ? "Loading…" : kits.length === 0 ? "No kits yet. Create one to get started" : `${kits.length} role${kits.length === 1 ? "" : "s"} in your library`}
             </p>
           </div>
           <Link

@@ -225,7 +225,7 @@ export function KitList({
           </div>
           <p className="relative mt-4 text-base font-extrabold text-[#0b1220]">No kits found</p>
           <p className="relative mx-auto mt-1 max-w-sm break-words text-sm text-[#67708f]">
-            Nothing matches <span className="font-bold text-[#0b1220]">“{query}”</span> — try another company or role.
+            Nothing matches <span className="font-bold text-[#0b1220]">“{query}”</span>, try another company or role.
           </p>
           <button
             type="button"

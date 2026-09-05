@@ -143,7 +143,7 @@ export function KitDetailHero({
             {[
               { label: "Must-have reqs", value: mustCount },
               { label: "Nice-to-have", value: niceCount },
-              { label: "Coverage", value: coveragePct != null ? `${coveragePct}%` : "—" },
+              { label: "Coverage", value: coveragePct != null ? `${coveragePct}%` : "-" },
               { label: "Sources", value: appendix.source.pages_used.length },
             ].map((stat) => (
               <div

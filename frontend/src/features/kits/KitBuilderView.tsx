@@ -343,7 +343,7 @@ function QuestionsEditor({
       )}
       {filtered.length === 0 && !showAdd ? (
         <p className="rounded-2xl border border-dashed border-[#d6d9eb] bg-white p-6 text-center text-sm text-[#67708f]">
-          No {category} questions yet — regenerate the category to create some.
+          No {category} questions yet. Regenerate the category to create some.
         </p>
       ) : (
         filtered.map((q) => (

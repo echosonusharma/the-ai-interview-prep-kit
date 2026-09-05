@@ -14,10 +14,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PrepPilot AI — AI Interview Prep Kit",
+  title: "PrepPilot AI: AI Interview Prep Kit",
   description: "Practice interviews, get coaching, level up. Built with PrepPilot AI design system.",
   openGraph: {
-    title: "PrepPilot AI — AI Interview Prep Kit",
+    title: "PrepPilot AI: AI Interview Prep Kit",
     description: "The AI-powered career simulator for tech interviews.",
   },
 };

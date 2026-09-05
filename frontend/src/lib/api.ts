@@ -3,7 +3,7 @@ import type { DashboardSummary, KitDetail, KitListResponse, KitSummary, Practice
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
 
 if (!process.env.NEXT_PUBLIC_API_URL && process.env.NODE_ENV === "production") {
-  console.warn("[api] NEXT_PUBLIC_API_URL is unset — falling back to http://localhost:5000");
+  console.warn("[api] NEXT_PUBLIC_API_URL is unset, falling back to http://localhost:5000");
 }
 
 export class ApiError extends Error {

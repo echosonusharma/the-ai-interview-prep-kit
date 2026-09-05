@@ -1115,16 +1115,16 @@ function ScheduleCalendar({
                   })}
                 </h3>
                 <p className="mt-2 text-[13px] leading-relaxed text-white/85">
-                  You&apos;ve done the work — today is about showing it. Stay calm, think out loud, be yourself.
+                  You&apos;ve done the work. Today is about showing it. Stay calm, think out loud, be yourself.
                 </p>
               </div>
               <div className="flex min-h-[400px] flex-1 flex-col p-5">
                 <ul className="space-y-2.5">
                   {[
-                    "Skim your answer outlines — don't cram new topics",
+                    "Skim your answer outlines. Don't cram new topics",
                     "Run one final mock to warm up your thinking",
                     "Sleep well, hydrate, arrive 10 minutes early",
-                    "It's mutual — ask them sharp questions too",
+                    "It's mutual. Ask them sharp questions too",
                   ].map((tip) => (
                     <li
                       key={tip}

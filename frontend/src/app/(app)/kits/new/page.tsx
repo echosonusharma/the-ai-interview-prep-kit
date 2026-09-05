@@ -14,7 +14,7 @@ export default function NewKitPage() {
           </span>
           <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-[#0b1220]">Interview kits</h1>
           <p className="mt-1 text-sm text-[#67708f]">
-            Create a new kit below — every kit you own lives here too.
+            Create a new kit below. Every kit you own lives here too.
           </p>
         </div>
       </div>
