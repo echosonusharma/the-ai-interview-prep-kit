@@ -285,7 +285,10 @@ async function simpleWebSearch(
   const url = `https://html.duckduckgo.com/html/?q=${encoded}`;
 
   const res = await fetch(url, {
-    headers: { "User-Agent": config.userAgent },
+    headers: {
+      "User-Agent": config.userAgent,
+      "Accept-Language": "en-US,en;q=0.9",
+    },
     signal: AbortSignal.timeout(10000),
   });
   if (!res.ok) {
@@ -321,7 +324,10 @@ async function bingRssSearch(
   const encoded = encodeURIComponent(query);
   const url = `https://www.bing.com/search?q=${encoded}&format=rss`;
   const res = await fetch(url, {
-    headers: { "User-Agent": config.userAgent },
+    headers: {
+      "User-Agent": config.userAgent,
+      "Accept-Language": "en-US,en;q=0.9",
+    },
     signal: AbortSignal.timeout(10000),
   });
   if (!res.ok) {

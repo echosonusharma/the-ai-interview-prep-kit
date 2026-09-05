@@ -67,7 +67,11 @@ export const DEFAULT_CONFIG: CrawlerConfig = {
   maxDepth: 2,
   requestTimeoutMs: 15000,
   maxContentLength: 2 * 1024 * 1024,
-  userAgent: "PrepKitBot/1.0 (+https://github.com/prepkit)",
+  // Browser identity: several sites (and search endpoints) serve bot-walled
+  // or challenge pages to crawler UAs. This is only an identity string —
+  // politeness still comes from robots.txt + 1 req/sec/host rate limiting.
+  userAgent:
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
   rateLimitPerHost: 1,
   respectCrawlDelay: true,
   minDelayMs: 1000,

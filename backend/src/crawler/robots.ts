@@ -59,7 +59,10 @@ export async function getRobotsInfo(url: string, config: CrawlerConfig): Promise
   } else if (!failedRecently(origin, now)) {
     try {
       const res = await fetch(`${origin}/robots.txt`, {
-        headers: { "User-Agent": config.userAgent },
+        headers: {
+          "User-Agent": config.userAgent,
+          "Accept-Language": "en-US,en;q=0.9",
+        },
         signal: AbortSignal.timeout(5000),
       });
       if (res.ok) {

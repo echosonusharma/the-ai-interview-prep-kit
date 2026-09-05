@@ -34,7 +34,7 @@ interface CrawlerConfig {
   maxDepth: 2;            // crawl depth from homepage
   requestTimeoutMs: 15000;
   maxContentLength: 2MB;
-  userAgent: "PrepKitBot/1.0";
+  userAgent: "<browser Chrome UA>"; // browser identity; politeness via robots.txt + rate limits
   rateLimitPerHost: 1;    // req/sec per hostname
   respectCrawlDelay: true; // honors robots.txt Crawl-delay
   minDelayMs: 1000;
