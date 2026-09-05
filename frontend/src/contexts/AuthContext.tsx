@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { useToast } from "@/components/ui/Toast";
 import type { User } from "@/lib/types";
@@ -20,7 +19,6 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
   const { push } = useToast();
 
   const refresh = useCallback(async () => {
@@ -36,7 +34,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // One-shot session fetch on mount - valid useEffect
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
   }, [refresh]);
 
@@ -44,16 +41,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { user: u } = await api.login({ email, password });
     setUser(u);
     push("success", "Signed in", `Welcome back, ${userDisplayName(u)}.`);
-    router.replace("/");
-    router.refresh();
+    window.location.replace("/");
   };
 
   const signup = async (email: string, password: string, name?: string) => {
     const { user: u } = await api.signup({ email, password, name });
     setUser(u);
     push("success", "Account created", `Welcome, ${userDisplayName(u)}.`);
-    router.replace("/");
-    router.refresh();
+    window.location.replace("/");
   };
 
   const logout = async () => {
@@ -64,8 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setUser(null);
     push("info", "Signed out");
-    router.replace("/login");
-    router.refresh();
+    window.location.replace("/login");
   };
 
   return (

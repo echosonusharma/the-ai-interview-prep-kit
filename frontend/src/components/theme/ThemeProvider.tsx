@@ -20,7 +20,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const saved = localStorage.getItem("theme") as Theme | null;
     // Light is always the default; only use dark if user explicitly chose it
     const initial: Theme = saved === "dark" ? "dark" : "light";
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTheme(initial);
     setMounted(true);
   }, []);

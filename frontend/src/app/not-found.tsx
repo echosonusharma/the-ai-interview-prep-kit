@@ -12,7 +12,6 @@ export default function NotFound() {
     const saved = localStorage.getItem("theme") as "light" | "dark" | null;
     const prefers = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const initial = saved ?? (prefers ? "dark" : "light");
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsDark(initial === "dark");
   }, []);
 

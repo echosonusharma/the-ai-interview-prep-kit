@@ -138,7 +138,7 @@ export function KitDetailContent({
   );
 
   const questionsByCategory = useMemo(() => {
-    const groups = new Map<string, typeof appendix.questions>();
+    const groups = new Map<string, KitAppendix["questions"]>();
     for (const q of appendix.questions) {
       if (qDifficulty !== "all" && q.difficulty !== qDifficulty) continue;
       const arr = groups.get(q.category) ?? [];

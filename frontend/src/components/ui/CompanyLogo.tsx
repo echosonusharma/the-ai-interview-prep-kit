@@ -55,6 +55,7 @@ export function CompanyLogo({
       style={style}
       className="shrink-0 overflow-hidden rounded-2xl border border-[#e6e8f2] bg-white shadow-sm grid place-items-center"
     >
+      {/* eslint-disable-next-line @next/next/no-img-element -- Remote logo fallbacks are dynamic and may not be configured for next/image. */}
       <img
         src={sources[idx]}
         alt={`${company} logo`}
