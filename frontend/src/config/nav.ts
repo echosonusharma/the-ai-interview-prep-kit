@@ -1,4 +1,4 @@
-import { Layers, LayoutDashboard, Settings, Sparkles, type LucideIcon } from "lucide-react";
+import { BookOpen, Layers, LayoutDashboard, Settings, Sparkles, Users, type LucideIcon } from "lucide-react";
 
 export interface NavItem {
   href: string;
@@ -13,6 +13,8 @@ export const navItems: NavItem[] = [
   { href: "/", label: "Dashboard", desc: "Your kits", Icon: LayoutDashboard, match: "exact" },
   { href: "/kits/new", label: "New kit", desc: "Create prep kit", Icon: Sparkles },
   { href: "/practice", label: "Practice", desc: "Flashcards", Icon: Layers },
+  { href: "/resources", label: "Resources", desc: "Playbooks", Icon: BookOpen },
+  { href: "/community", label: "Community", desc: "Peer mocks", Icon: Users },
   { href: "/settings", label: "Settings", desc: "Preferences", Icon: Settings },
 ];
 
