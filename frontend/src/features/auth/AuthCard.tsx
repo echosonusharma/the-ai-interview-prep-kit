@@ -5,11 +5,13 @@ import { useState } from "react";
 import { AuthSidePanel } from "./AuthSidePanel";
 import { SocialAuthButtons } from "./SocialAuthButtons";
 import { ApiError } from "@/lib/api";
+import { useToast } from "@/components/ui/Toast";
 
 /** Shared email/password submit state: loading guard + announced errors. */
 export function useAuthSubmit(action: () => Promise<void>) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { push } = useToast();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,7 +21,9 @@ export function useAuthSubmit(action: () => Promise<void>) {
     try {
       await action();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Request failed");
+      const message = err instanceof ApiError ? err.message : "Request failed";
+      setError(message);
+      push("error", "Something went wrong", message);
     } finally {
       // Reset even on success: if post-login navigation fails or bounces,
       // the form must not stay stuck in its pending state.

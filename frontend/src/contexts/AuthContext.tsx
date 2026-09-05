@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
+import { useToast } from "@/components/ui/Toast";
 import type { User } from "@/lib/types";
 
 interface AuthContextValue {
@@ -20,6 +21,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const { push } = useToast();
 
   const refresh = useCallback(async () => {
     try {
@@ -41,13 +43,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     const { user: u } = await api.login({ email, password });
     setUser(u);
-    router.push("/");
+    push("success", "Signed in", `Welcome back, ${userDisplayName(u)}.`);
+    router.replace("/");
+    router.refresh();
   };
 
   const signup = async (email: string, password: string, name?: string) => {
     const { user: u } = await api.signup({ email, password, name });
     setUser(u);
-    router.push("/");
+    push("success", "Account created", `Welcome, ${userDisplayName(u)}.`);
+    router.replace("/");
+    router.refresh();
   };
 
   const logout = async () => {
@@ -57,7 +63,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!(e instanceof ApiError)) throw e;
     }
     setUser(null);
-    router.push("/login");
+    push("info", "Signed out");
+    router.replace("/login");
+    router.refresh();
   };
 
   return (
