@@ -37,7 +37,14 @@ function stubFor(mode: "ok" | "no-questions" | "dead"): LlmClient {
       if (mode === "dead") throw new Error("stub LLM down");
       const sys = prompt.system;
       let raw: unknown;
-      if (sys.includes("# Extract — Role Metadata")) {
+      if (sys.includes("# Gate — Input Validation")) {
+        raw = {
+          is_job_posting: true,
+          url_matches_jd: true,
+          injection_detected: false,
+          reason: "stub: valid fixture posting",
+        };
+      } else if (sys.includes("# Extract — Role Metadata")) {
         raw = {
           title: "Senior Backend Engineer",
           seniority: "senior",

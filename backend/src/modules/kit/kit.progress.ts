@@ -3,6 +3,8 @@ const STEP_MAP: Record<string, { label: string; progress: number }> = {
   queued: { label: "Queued…", progress: 0 },
   starting: { label: "Starting…", progress: 1 },
   requeued: { label: "Queued…", progress: 0 },
+  gate: { label: "Validating input", progress: 3 },
+  "gate:done": { label: "Input valid", progress: 6 },
   research: { label: "Researching company site", progress: 8 },
   "research:done": { label: "Research complete", progress: 18 },
   extract: { label: "Extracting role & requirements", progress: 28 },

@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { KitAppendix, KitDetail } from "@/lib/types";
 import { Button, buttonStyles } from "@/components/ui/Button";
 import { CompanyLogo } from "@/components/ui/CompanyLogo";
+import { DeleteKitButton } from "./DeleteKitButton";
 
 export function KitDetailHero({
   kit,
@@ -18,6 +20,7 @@ export function KitDetailHero({
   onNewKit: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const t = requestAnimationFrame(() => setMounted(true));
@@ -131,6 +134,14 @@ export function KitDetailHero({
             <Button variant="secondary" size="lg" onClick={onNewKit}>
               New kit
             </Button>
+            {(kit.status === "done" || kit.status === "failed") && (
+              <DeleteKitButton
+                variant="button"
+                kitId={kitId}
+                status={kit.status}
+                onDeleted={() => router.push("/kits/new")}
+              />
+            )}
           </div>
         </div>
 

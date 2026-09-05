@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import {
   createKit,
   createKitBatch,
+  deleteKitForOwner,
   listKitsPage,
   type KitListSort,
   getDashboardSummary,
@@ -23,7 +24,7 @@ import {
   deleteFlashcard,
 } from "./kit-builder.service.js";
 import { getPracticeDeck, recordFlashcardReview } from "./kit-practice.service.js";
-import { isRegenSection, regenerateSection } from "./kit-regenerate.service.js";
+import { regenerateSection, type RegenSection } from "./kit-regenerate.service.js";
 import { serializeKitSummary, serializeKitDetail } from "./kit.serializer.js";
 import { kickKitWorker } from "./kit.queue.js";
 import { kitEvents, type KitEvent, type KitEventPayload, type KitEventType } from "./kit.events.js";
@@ -31,18 +32,6 @@ import { kitEvents, type KitEvent, type KitEventPayload, type KitEventType } fro
 function kitIdParam(req: Request): string {
   const id = req.params.id;
   return Array.isArray(id) ? id[0]! : id!;
-}
-
-/**
- * Strict days validation for the single-create API path: integer 1..60, else
- * 400. The batch path intentionally skips this and relies on the service
- * clamp so one out-of-range case doesn't fail the whole batch.
- */
-function invalidDaysError(days: unknown): string | null {
-  if (typeof days !== "number" || !Number.isInteger(days) || days < 1 || days > 60) {
-    return "days must be an integer between 1 and 60";
-  }
-  return null;
 }
 
 function sseWrite(res: Response, event: string, data: unknown, id?: number) {
@@ -72,23 +61,18 @@ async function respondKit(res: Response, kit: Awaited<ReturnType<typeof loadKit>
 }
 
 export async function createKitBatchHandler(req: Request, res: Response): Promise<void> {
+  // Body shape (cases 1..20, each with rawJd/companyUrl/days) is enforced by
+  // validate({ body: createKitBatchBody }); per-case failures surface via
+  // createKitBatch errors so one bad case doesn't fail the whole batch.
   const { cases } = req.body as {
-    cases?: Array<{ rawJd?: string; companyUrl?: string; days?: number }>;
+    cases: Array<{ rawJd: string; companyUrl: string; days: number }>;
   };
-  if (!Array.isArray(cases) || cases.length === 0) {
-    res.status(400).json({ error: "cases array is required" });
-    return;
-  }
-  if (cases.length > 20) {
-    res.status(400).json({ error: "Maximum 20 cases per batch" });
-    return;
-  }
   const { created, errors } = await createKitBatch(
     req.session.userId!,
     cases.map((c) => ({
-      rawJd: c.rawJd ?? "",
-      companyUrl: c.companyUrl ?? "",
-      days: c.days ?? 5,
+      rawJd: c.rawJd,
+      companyUrl: c.companyUrl,
+      days: c.days,
     }))
   );
   // Only wake the worker when there is actually queued work.
@@ -100,23 +84,14 @@ export async function createKitBatchHandler(req: Request, res: Response): Promis
 }
 
 export async function createKitHandler(req: Request, res: Response): Promise<void> {
+  // rawJd/companyUrl/days shape enforced by validate({ body: createKitBody }).
   const { rawJd, companyUrl, days } = req.body as {
-    rawJd?: string;
-    companyUrl?: string;
-    days?: number;
+    rawJd: string;
+    companyUrl: string;
+    days: number;
   };
 
-  const daysError = invalidDaysError(days ?? 5);
-  if (daysError) {
-    res.status(400).json({ error: daysError });
-    return;
-  }
-
-  const kit = await createKit(req.session.userId!, {
-    rawJd: rawJd ?? "",
-    companyUrl: companyUrl ?? "",
-    days: days ?? 5,
-  });
+  const kit = await createKit(req.session.userId!, { rawJd, companyUrl, days });
 
   kickKitWorker();
 
@@ -125,17 +100,16 @@ export async function createKitHandler(req: Request, res: Response): Promise<voi
 }
 
 export async function listKitsHandler(req: Request, res: Response): Promise<void> {
-  const q = (name: string): string => {
-    const v = req.query[name];
-    return String(Array.isArray(v) ? v[0] : v ?? "");
+  // Query coerced/defaulted by validate({ query: listKitsQuery }).
+  const { page, limit, sort, status, q: search } = req.query as unknown as {
+    page: number;
+    limit: number;
+    sort: KitListSort;
+    status?: string;
+    q?: string;
   };
-  const page = Math.max(parseInt(q("page") || "1", 10) || 1, 1);
-  const limit = Math.min(Math.max(parseInt(q("limit") || "50", 10) || 50, 1), 50);
-  const rawSort = q("sort");
-  const sort: KitListSort = rawSort === "oldest" || rawSort === "upcoming" ? rawSort : "newest";
-  const status = q("status") || undefined;
-  const search = q("q") || undefined;
-  const { kits, total } = await listKitsPage(req.session.userId!, { page, limit, sort, status, q: search });
+  const statusFilter = status || undefined;
+  const { kits, total } = await listKitsPage(req.session.userId!, { page, limit, sort, status: statusFilter, q: search });
   const summaries = await Promise.all(
     kits.map(async (kit) => serializeKitSummary(kit, await getQueuePosition(kit)))
   );
@@ -144,10 +118,8 @@ export async function listKitsHandler(req: Request, res: Response): Promise<void
 }
 
 export async function getDashboardHandler(req: Request, res: Response): Promise<void> {
-  const rawPage = Array.isArray(req.query.page) ? req.query.page[0] : req.query.page;
-  const rawLimit = Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit;
-  const page = Math.max(parseInt(String(rawPage ?? "1"), 10) || 1, 1);
-  const limit = Math.min(Math.max(parseInt(String(rawLimit ?? "5"), 10) || 5, 1), 20);
+  // Query coerced/defaulted by validate({ query: dashboardQuery }).
+  const { page, limit } = req.query as unknown as { page: number; limit: number };
   res.json(await getDashboardSummary(req.session.userId!, page, limit));
 }
 
@@ -159,6 +131,11 @@ export async function getKitHandler(req: Request, res: Response): Promise<void> 
   }
   const queuePosition = await getQueuePosition(kit);
   res.json(serializeKitDetail(kit, queuePosition));
+}
+
+export async function deleteKitHandler(req: Request, res: Response): Promise<void> {
+  await deleteKitForOwner(kitIdParam(req), req.session.userId!);
+  res.json({ ok: true });
 }
 
 export async function streamKitEventsHandler(req: Request, res: Response): Promise<void> {
@@ -303,11 +280,7 @@ export async function reorderQuestionsHandler(req: Request, res: Response): Prom
     res.status(404).json({ error: "Kit not found" });
     return;
   }
-  const { order } = req.body as { order?: string[] };
-  if (!Array.isArray(order)) {
-    res.status(400).json({ error: "order array is required" });
-    return;
-  }
+  const { order } = req.body as { order: string[] };
   const updated = await reorderQuestions(kit, order);
   await respondKit(res, updated);
 }
@@ -382,11 +355,7 @@ export async function regenerateSectionHandler(req: Request, res: Response): Pro
     res.status(404).json({ error: "Kit not found" });
     return;
   }
-  const section = Array.isArray(req.params.section) ? req.params.section[0]! : req.params.section!;
-  if (!isRegenSection(section)) {
-    res.status(400).json({ error: `Invalid section. Use: brief, technical, behavioural, system-design, company-fit, schedule` });
-    return;
-  }
+  const section = (Array.isArray(req.params.section) ? req.params.section[0]! : req.params.section!) as RegenSection;
   const updated = await regenerateSection(kit, section);
   await respondKit(res, updated);
 }
@@ -411,15 +380,8 @@ export async function postPracticeReviewHandler(req: Request, res: Response): Pr
     res.status(404).json({ error: "Kit not found" });
     return;
   }
-  const { flashcardId, confidence } = req.body as { flashcardId?: string; confidence?: number };
-  if (!flashcardId || confidence === undefined) {
-    res.status(400).json({ error: "flashcardId and confidence (1-5) are required" });
-    return;
-  }
-  if (![1, 2, 3, 4, 5].includes(confidence)) {
-    res.status(400).json({ error: "confidence must be 1-5" });
-    return;
-  }
-  const updated = await recordFlashcardReview(kit, flashcardId, confidence as 1 | 2 | 3 | 4 | 5);
+  // flashcardId/confidence shape enforced by validate({ body: practiceReviewBody }).
+  const { flashcardId, confidence } = req.body as { flashcardId: string; confidence: 1 | 2 | 3 | 4 | 5 };
+  const updated = await recordFlashcardReview(kit, flashcardId, confidence);
   res.json(getPracticeDeck(updated));
 }

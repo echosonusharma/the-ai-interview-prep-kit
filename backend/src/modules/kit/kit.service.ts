@@ -407,6 +407,28 @@ export async function getKitForOwner(kitId: string, ownerId: string): Promise<IK
   return Kit.findOne({ _id: kitId, owner: ownerId });
 }
 
+/**
+ * Delete a kit owned by the user. Queued/running kits are rejected: the worker
+ * holds the document in memory and its terminal save() would resurrect a
+ * deleted row. Delete only after generation settles (done/failed).
+ */
+export async function deleteKitForOwner(kitId: string, ownerId: string): Promise<void> {
+  const kit = await Kit.findOne({ _id: kitId, owner: ownerId });
+  if (!kit) {
+    const err = new Error("Kit not found") as Error & { statusCode?: number };
+    err.statusCode = 404;
+    throw err;
+  }
+  if (kit.job.status === "queued" || kit.job.status === "running") {
+    const err = new Error("Wait until generation finishes before deleting this kit") as Error & {
+      statusCode?: number;
+    };
+    err.statusCode = 409;
+    throw err;
+  }
+  await Kit.deleteOne({ _id: kit._id });
+}
+
 export async function recoverStaleRunningJobs() {
   const cutoff = new Date(Date.now() - env.CASE_TIMEOUT_MS);
   // updateMany is atomic per document and already guarded on job.status still

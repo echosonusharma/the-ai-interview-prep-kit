@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import type { KitStatus, KitSummary } from "@/lib/types";
 import { daysLeft, type SortKey } from "@/lib/kits";
 import { CompanyLogo } from "@/components/ui/CompanyLogo";
+import { DeleteKitButton } from "./DeleteKitButton";
 
 const STATUS_STYLES: Record<KitStatus | "unknown", { bg: string; text: string; dot: string }> = {
   done: { bg: "bg-[#ecfdf5]", text: "text-[#059669]", dot: "bg-[#10b981]" },
@@ -72,6 +73,8 @@ interface KitListProps {
   pageSize?: number;
   /** Override the grid columns (wider cards = fewer columns). */
   gridClassName?: string;
+  /** Called after a kit is deleted (parents with preloaded kits can refetch). */
+  onDeleted?: (id: string) => void;
 }
 
 export function KitList({
@@ -84,6 +87,7 @@ export function KitList({
   paginate = false,
   pageSize,
   gridClassName = "grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 w-full",
+  onDeleted,
 }: KitListProps) {
   const [kitsInternal, setKitsInternal] = useState<KitSummary[]>([]);
   const [loadingInternal, setLoadingInternal] = useState(kitsProp === undefined);
@@ -94,6 +98,7 @@ export function KitList({
   const [pagination, setPagination] = useState<{ total: number; totalPages: number } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
   const searchParams = useSearchParams();
 
   // Deep-link support: topbar search navigates here with ?q= (applied immediately,
@@ -110,8 +115,12 @@ export function KitList({
 
   const controlled = kitsProp !== undefined;
   // Server owns sort + paging for the uncontrolled list; controlled lists
-  // (dashboard) render preloaded kits as given.
-  const kits = controlled ? (limit ? kitsProp.slice(0, limit) : kitsProp) : kitsInternal;
+  // (dashboard) render preloaded kits as given. Locally removed kits are
+  // filtered in both modes so delete feels instant.
+  const visible = (controlled ? (limit ? kitsProp.slice(0, limit) : kitsProp) : kitsInternal).filter(
+    (k) => !removedIds.includes(k.id)
+  );
+  const kits = visible;
   const loading = controlled ? (loadingProp ?? false) : loadingInternal;
 
   useEffect(() => {
@@ -152,6 +161,10 @@ export function KitList({
   const submitSearch = () => {
     setQuery(searchInput.trim());
     setPage(1);
+  };
+  const handleDeleted = (id: string) => {
+    setRemovedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    onDeleted?.(id);
   };
   const clearSearch = () => {
     setSearchInput("");
@@ -349,9 +362,14 @@ export function KitList({
                 <span className={`w-1.5 h-1.5 rounded-full ${st.dot} ${k.status === "running" ? "animate-pulse" : ""}`} />
                 {k.status}
               </span>
-              {(k.status === "running" || k.status === "queued") && (
-                <span className="text-xs font-bold text-[#5b5bf5] tabular-nums">{k.progress}%</span>
-              )}
+              <span className="inline-flex items-center gap-1.5">
+                {(k.status === "running" || k.status === "queued") && (
+                  <span className="text-xs font-bold text-[#5b5bf5] tabular-nums">{k.progress}%</span>
+                )}
+                {(k.status === "done" || k.status === "failed") && (
+                  <DeleteKitButton kitId={k.id} status={k.status} onDeleted={handleDeleted} />
+                )}
+              </span>
             </div>
 
             <div className="mt-3 flex items-center gap-2.5">

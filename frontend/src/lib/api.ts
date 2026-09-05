@@ -62,6 +62,8 @@ export const api = {
 
   getKit: (id: string) => request<KitDetail>(`/api/kits/${id}`),
 
+  deleteKit: (id: string) => request<{ ok: boolean }>(`/api/kits/${id}`, { method: "DELETE" }),
+
   createKit: (data: { rawJd: string; companyUrl: string; days: number }) =>
     request<KitDetail>("/api/kits", { method: "POST", body: JSON.stringify(data) }),
 
