@@ -52,6 +52,7 @@ const schema = z
       .transform((v) => v === "1" || v === "true"),
     BATCH_CONCURRENCY: z.coerce.number().int().min(1).max(5).default(2),
     CASE_TIMEOUT_MS: z.coerce.number().int().min(60_000).max(900_000).default(240_000),
+    CRAWL_CACHE_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(24),
   })
   .refine(
     (data) =>
@@ -87,6 +88,7 @@ export const env = {
   LLM_DEBUG_RAW: parsed.data.LLM_DEBUG_RAW ?? false,
   BATCH_CONCURRENCY: parsed.data.BATCH_CONCURRENCY,
   CASE_TIMEOUT_MS: parsed.data.CASE_TIMEOUT_MS,
+  CRAWL_CACHE_TTL_HOURS: parsed.data.CRAWL_CACHE_TTL_HOURS,
 };
 
 export function getZenModels(): string[] {

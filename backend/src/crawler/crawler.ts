@@ -1,8 +1,9 @@
 import * as cheerio from "cheerio";
 import type { CrawlerConfig, CrawlResult, CrawlerOutput, DiscussionHit } from "./types.js";
-import { DEFAULT_CONFIG } from "./types.js";
+import { DEFAULT_CONFIG, MAX_ATS_PAGES, CAREER_PATH_PROBES, CAREER_SIGNAL_KEYWORDS } from "./types.js";
+import { getCachedCrawl, setCachedCrawl, crawlCacheKey } from "./cache.js";
 import { fetchPage } from "./fetcher.js";
-import { extractLinks, getTopLinks } from "./link-extractor.js";
+import { extractLinks, extractAtsLinks, getTopLinks } from "./link-extractor.js";
 import { extractContent } from "./content-extractor.js";
 import { normalizeOutboundUrl, validateUrl } from "./url-validator.js";
 
@@ -38,6 +39,13 @@ export async function crawlCompanySite(
   }
 
   const normalizedBase = baseUrl.endsWith("/") ? baseUrl : baseUrl + "/";
+
+  const cacheKey = config.enableCache ? crawlCacheKey(normalizedBase) : null;
+  if (cacheKey) {
+    const cached = await getCachedCrawl(cacheKey);
+    if (cached) return cached;
+  }
+
   const results: CrawlResult[] = [];
   const queue: CrawlQueueItem[] = [];
   const visited = new Set<string>([normalizedBase]);
@@ -45,12 +53,43 @@ export async function crawlCompanySite(
   const homepageResult = await fetchPage(normalizedBase, config);
   results.push(homepageResult);
 
+  // Off-site ATS careers pages (e.g. xyz.zohorecruit.in) — fetched after the
+  // main loop under their own small budget. Fetched via fetchPage, so the
+  // usual SSRF guards (validateUrl, DNS checks) still apply.
+  let atsUrls: string[] = [];
+  // Speculative same-site probes — 404s are expected, never warned about.
+  const probeUrls = new Set<string>();
+
   if (homepageResult.status === "success" && homepageResult.content) {
     const links = extractLinks(homepageResult.content, normalizedBase, config);
     const topLinks = getTopLinks(links, config.maxPages - 1);
 
     for (const link of topLinks) {
       if (!visited.has(link.url)) queue.push({ url: link.url, depth: 1, score: link.score });
+    }
+
+    atsUrls = extractAtsLinks(homepageResult.content, normalizedBase)
+      .slice(0, MAX_ATS_PAGES)
+      .map((l) => l.url);
+
+    // No careers signal on the homepage (JS-rendered nav, odd wording) and
+    // no ATS link either — probe the usual paths first, inside the page budget.
+    const hasCareerSignal =
+      atsUrls.length > 0 ||
+      links.some((l) => l.keywords.some((k) => CAREER_SIGNAL_KEYWORDS.has(k)));
+    if (!hasCareerSignal) {
+      for (const path of CAREER_PATH_PROBES) {
+        let probe: string;
+        try {
+          probe = new URL(path, normalizedBase).toString();
+        } catch {
+          continue;
+        }
+        if (!visited.has(probe)) {
+          probeUrls.add(probe);
+          queue.push({ url: probe, depth: 1, score: 1_000_000 });
+        }
+      }
     }
   } else if (homepageResult.error) {
     warnings.push(`Homepage: ${homepageResult.error}`);
@@ -67,7 +106,7 @@ export async function crawlCompanySite(
     const result = await fetchPage(item.url, config);
     results.push(result);
 
-    if (result.error) {
+    if (result.error && !probeUrls.has(item.url)) {
       warnings.push(`${item.url}: ${result.error}`);
     }
 
@@ -85,6 +124,12 @@ export async function crawlCompanySite(
     }
   }
 
+  for (const atsUrl of atsUrls) {
+    const page = await fetchPage(atsUrl, config);
+    results.push(page);
+    if (page.error) warnings.push(`${atsUrl}: ${page.error}`);
+  }
+
   const enrichedResults = results.map((r) => {
     if (r.status === "success" && r.content) {
       const { title, text } = extractContent(r.content, r.url);
@@ -93,12 +138,20 @@ export async function crawlCompanySite(
     return r;
   });
 
-  return {
+  const output: CrawlerOutput = {
     pages: enrichedResults,
     baseUrl: normalizedBase,
     crawledAt: new Date().toISOString(),
     warnings: warnings.length ? warnings : undefined,
   };
+
+  // Only cache crawls that actually yielded a page — a total outage must not
+  // poison the cache for 24h.
+  if (cacheKey && enrichedResults.some((r) => r.status === "success")) {
+    await setCachedCrawl(cacheKey, normalizedBase, output);
+  }
+
+  return output;
 }
 
 const SEARCH_QUERIES = (companyName: string) => [
@@ -146,15 +199,28 @@ export async function searchPublicDiscussion(
     }
   }
 
-  if (results.length === 0) {
-    if (queriesFailed > 0) {
+  // Relevance gate: keyless search endpoints match loosely, so drop hits
+  // that never mention the company — otherwise unrelated pages (spam,
+  // name-collisions) pollute the brief's hiring-process context.
+  const name = companyName.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const tokens = name.split(" ").filter((t) => t.length >= 4);
+  const longest = tokens.sort((a, b) => b.length - a.length)[0];
+  const relevant = results.filter((hit) => {
+    const hay = `${hit.title} ${hit.snippet} ${hit.url}`.toLowerCase();
+    return (name && hay.includes(name)) || (longest !== undefined && hay.includes(longest));
+  });
+
+  if (relevant.length === 0) {
+    if (results.length > 0) {
+      warnings.push(`Public search returned ${results.length} unrelated result(s) for "${companyName}"; ignored`);
+    } else if (queriesFailed > 0) {
       warnings.push(`Public search failed for ${queriesFailed}/${queries.length} queries`);
     } else {
       warnings.push("Public search returned no results");
     }
   }
 
-  return { query: companyName, results: results.slice(0, 12), warnings };
+  return { query: companyName, results: relevant.slice(0, 12), warnings };
 }
 
 /** Fetch readable text from top public discussion/review URLs. */
@@ -206,6 +272,15 @@ async function simpleWebSearch(
   query: string,
   config: CrawlerConfig
 ): Promise<Array<{ url: string; title: string; snippet: string }>> {
+  // Bing RSS first — DuckDuckGo's HTML endpoint serves bot challenges (HTTP
+  // 202, zero results) on several networks, which used to leave every kit
+  // with no public discussion at all.
+  try {
+    const rss = await bingRssSearch(query, config);
+    if (rss.length > 0) return rss;
+  } catch {
+    // Fall through to DuckDuckGo.
+  }
   const encoded = encodeURIComponent(query);
   const url = `https://html.duckduckgo.com/html/?q=${encoded}`;
 
@@ -218,6 +293,41 @@ async function simpleWebSearch(
   }
   const html = await res.text();
   return parseSearchResults(html, config);
+}
+
+function parseBingRss(
+  xml: string,
+  config: CrawlerConfig
+): Array<{ url: string; title: string; snippet: string }> {
+  const $ = cheerio.load(xml, { xmlMode: true });
+  const results: Array<{ url: string; title: string; snippet: string }> = [];
+  $("item").each((_, el) => {
+    const $el = $(el);
+    const title = $el.find("title").first().text().trim();
+    const rawUrl = $el.find("link").first().text().trim();
+    const url = rawUrl ? normalizeOutboundUrl(rawUrl) : null;
+    const snippet = $el.find("description").first().text().trim().slice(0, 500);
+    if (title && url && validateUrl(url, config).valid) {
+      results.push({ url, title, snippet });
+    }
+  });
+  return results.slice(0, 10);
+}
+
+async function bingRssSearch(
+  query: string,
+  config: CrawlerConfig
+): Promise<Array<{ url: string; title: string; snippet: string }>> {
+  const encoded = encodeURIComponent(query);
+  const url = `https://www.bing.com/search?q=${encoded}&format=rss`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": config.userAgent },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) {
+    throw new Error(`Bing RSS HTTP ${res.status}`);
+  }
+  return parseBingRss(await res.text(), config);
 }
 
 function parseSearchResults(

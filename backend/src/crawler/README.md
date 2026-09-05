@@ -7,10 +7,12 @@ Crawls company websites to discover hiring-related pages and extract clean conte
 ## How It Works
 
 1. **Fetch homepage** - Respects robots.txt, rate limits per host
-2. **Extract & score links** - Cheerio parses HTML, scores all same-origin links by keyword relevance (29 weighted keywords: careers=10, jobs=9, hiring=9, handbook=7, interview=8, etc.)
-3. **Crawl top-N pages** - Breadth-first up to `maxDepth` (default 2), `maxPages` (default 10)
-4. **Extract content** - Removes nav/footer/scripts/ads, targets main content areas
-5. **Return structured results** - Each page: URL, status, title, cleaned text, metadata
+2. **Follow ATS careers links** - Off-site links to known job-board hosts (Zoho Recruit, Greenhouse, Lever, Workable, Ashby, …) are fetched under their own cap (`MAX_ATS_PAGES = 2`); same-origin crawling can never reach them
+3. **Extract & score links** - Cheerio parses HTML, scores all same-origin links by keyword relevance (29 weighted keywords: careers=10, jobs=9, hiring=9, handbook=7, interview=8, etc.)
+4. **Probe career paths** - When the homepage shows no careers signal and no ATS link, `/careers`, `/jobs`, `/join-us` jump the queue (404s expected, never warned)
+5. **Crawl top-N pages** - Breadth-first up to `maxDepth` (default 2), `maxPages` (default 10, 8 for kits)
+6. **Extract content** - Removes nav/footer/scripts/ads, targets main content areas
+7. **Return structured results** - Each page: URL, status, title, cleaned text, metadata
 
 ## Usage
 
@@ -39,8 +41,27 @@ interface CrawlerConfig {
   maxRetries: 3;
   backoffBaseMs: 1000;
   isProd: boolean;        // blocks HTTP in production
+  enableCache: true;      // reuse Mongo-cached crawls younger than 24h
 }
 ```
+
+## Crawl cache (Mongo, 24h)
+
+`crawlCompanySite` caches successful company-site crawls in the `crawl_cache`
+collection (schema: `src/models/crawl-cache.model.ts`, helpers:
+`src/crawler/cache.ts`). Key = root domain (`careers.xyz.com` → `xyz.com`),
+so all pages/paths of one company share a single entry. Rows carry a TTL
+index (`CRAWL_CACHE_TTL_HOURS`, default 24) and every read re-checks age, so
+stale rows are never served even if the TTL sweep lags.
+
+- Best-effort: with no Mongo connection (tests, local scripts) the cache is
+  skipped silently. Cache errors never fail a crawl.
+- Total failures (zero successful pages) are not cached.
+- Opt out per call with `{ enableCache: false }`; clear in tests with
+  `clearCrawlCache()`.
+- Public-discussion search (`enrichPublicDiscussion`) is not cached.
+- Changing `CRAWL_CACHE_TTL_HOURS` requires dropping the old `crawledAt_1`
+  index so it is rebuilt with the new expiry.
 
 ## Security
 
@@ -61,7 +82,7 @@ interface CrawlerConfig {
 | **Rate limiting** | Conservative (1 req/sec/host) to be polite; slow for large sites |
 | **Depth limit** | Default maxDepth=2; deep pages not reached |
 | **Keyword-based scoring** | Heuristic; may miss pages with unconventional naming |
-| **Public discussion search** | DuckDuckGo HTML scrape; fragile, rate-limited, no API |
+| **Public discussion search** | Bing RSS primary, DuckDuckGo HTML fallback; no API key, relevance varies for small firms |
 | **No sitemap.xml parsing** | Could improve discovery; currently only follows links |
 | **Single-threaded** | Sequential per-host; no parallel fetch across hosts |
 | **No login/auth** | Cannot access protected pages |
