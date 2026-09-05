@@ -36,6 +36,15 @@ export function KitDetailView({ kitId }: { kitId: string }) {
     if (done || failed) void refresh();
   }, [done, failed, refresh]);
 
+  // Poll while generating: covers SSE dying before the terminal event.
+  useEffect(() => {
+    if (!streaming) return;
+    const t = setInterval(() => {
+      void refresh();
+    }, 8000);
+    return () => clearInterval(t);
+  }, [streaming, refresh]);
+
   if (loadError) {
     return (
       <div className="px-4 md:px-8 py-12">

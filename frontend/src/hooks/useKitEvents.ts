@@ -41,13 +41,12 @@ export function useKitEvents(kitId: string | null, enabled: boolean) {
       setFailed(true);
       es.close();
     };
-    const onError = () => es.close();
+    // No "error" listener: native reconnect must survive transient blips.
 
     es.addEventListener("status", onStatus);
     es.addEventListener("progress", onStatus);
     es.addEventListener("complete", onComplete);
     es.addEventListener("failed", onFailed);
-    es.addEventListener("error", onError);
 
     return () => {
       es.close();
