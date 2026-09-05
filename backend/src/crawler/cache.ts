@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { env } from "../config/env.js";
 import { CrawlCache } from "../models/crawl-cache.model.js";
 import type { CrawlerOutput } from "./types.js";
+import { error } from "node:console";
 
 /** Company-site crawl results are reused for this long (env-overridable). */
 export const CRAWL_CACHE_TTL_MS = env.CRAWL_CACHE_TTL_HOURS * 60 * 60 * 1000;
@@ -57,15 +58,15 @@ export async function setCachedCrawl(key: string, baseUrl: string, output: Crawl
       { $set: { baseUrl, output, crawledAt: new Date(output.crawledAt) } },
       { upsert: true }
     );
-  } catch {
-    // Best-effort — a failed write must not fail the kit.
+  } catch (error) {
+    console.log(error, "failed to cache crawl")
   }
 }
 
 export async function clearCrawlCache(): Promise<void> {
   try {
     if (cacheUsable()) await CrawlCache.deleteMany({});
-  } catch {
-    // Best-effort.
+  } catch (error) {
+    console.log(error, "failed to clear crawl cache")
   }
 }

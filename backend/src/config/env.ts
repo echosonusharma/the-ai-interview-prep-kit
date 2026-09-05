@@ -8,10 +8,8 @@ export const JSON_MODELS = [
   "muse-spark-1.3-contributor-free",
   "muse-spark-1.2-contributor-free",
 ] as const;
-
 /** Chat models — good at prose; poor at JSON. Used for brief (plain text). */
 export const TEXT_MODELS = ["mimo-v2.5-free", "big-pickle", "nemotron-3-ultra-free"] as const;
-
 /** In catalog but never auto-selected — thinking prose or rate limits. */
 const AVOID_MODELS = new Set(["nemotron-3.5-lightning-free", "ling-3.0-flash-fin-free"]);
 

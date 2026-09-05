@@ -1,4 +1,5 @@
 import { isRateLimitError, withRetry } from "../retry.js";
+import { logger } from "../../utils/logger.js";
 import type { Provenance } from "./client.js";
 import { logStyle as s } from "../log.js";
 
@@ -34,7 +35,7 @@ export async function runWithFallbacks<T>(label: string, attempts: Attempt<T>[],
             maxRetries: 0,
             backoffBaseMs: 400,
             onRetry: (n, err, waitMs) =>
-              console.warn(
+              logger.warn(
                 `${s.label(`[${label}]`)} ${s.provider(attempt.provenance.provider)}/${s.model(attempt.provenance.model)} ${s.warn(`retry ${n + 1} in ${Math.round(waitMs)}ms`)}: ${s.detail(err instanceof Error ? err.message.slice(0, 220) : String(err))}`
               ),
           })
@@ -46,7 +47,7 @@ export async function runWithFallbacks<T>(label: string, attempts: Attempt<T>[],
       const msg = error instanceof Error ? error.message : String(error);
       const limit = msg.includes("Raw output") ? 1500 : 220;
       const failTag = rateLimited ? s.warn("failed (rate-limited)") : s.fail("failed");
-      console.warn(
+      logger.warn(
         `${s.label(`[${label}]`)} ${s.provider(attempt.provenance.provider)}/${s.model(attempt.provenance.model)} ${failTag}: ${msg.includes("Raw output") ? s.raw(msg.slice(0, limit)) : s.detail(msg.slice(0, limit))}`
       );
       // Don't waste extra retries on same rate-limited provider — failover already handled by withRetry throwing fast

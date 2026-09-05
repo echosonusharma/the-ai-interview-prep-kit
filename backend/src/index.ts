@@ -1,5 +1,6 @@
 import app from "./app.js";
 import { env } from "./config/env.js";
+import { logger } from "./utils/logger.js";
 import { connectDB, disconnectDB } from "./config/db.js";
 import { startKitWorker } from "./modules/kit/kit.queue.js";
 
@@ -9,31 +10,31 @@ async function start() {
     await connectDB();
     startKitWorker();
   } catch (err) {
-    console.error("Failed to connect to MongoDB:", err);
+    logger.error("Failed to connect to MongoDB:", err);
     // In production, crash so orchestrator restarts; in dev/test allow running without DB if desired
     if (env.isProd) process.exit(1);
-    console.warn("Continuing without MongoDB (non-production). Set MONGODB_URI to enable persistence.");
+    logger.warn("Continuing without MongoDB (non-production). Set MONGODB_URI to enable persistence.");
   }
 
   const server = app.listen(env.PORT, () => {
-    console.log(`Server running on http://localhost:${env.PORT} [${env.NODE_ENV}]`);
+    logger.info(`Server running on http://localhost:${env.PORT} [${env.NODE_ENV}]`);
   });
 
   // Graceful shutdown — closes HTTP + MongoDB
   const shutdown = async (signal: string) => {
-    console.log(`\n${signal} received — shutting down gracefully...`);
+    logger.info(`${signal} received — shutting down gracefully...`);
     server.close(async () => {
       try {
         await disconnectDB();
       } catch (e) {
-        console.error("Error disconnecting MongoDB:", e);
+        logger.error("Error disconnecting MongoDB:", e);
       }
       process.exit(0);
     });
 
     // Force close if not done in 10s
     setTimeout(() => {
-      console.error("Graceful shutdown timed out — forcing exit");
+      logger.error("Graceful shutdown timed out — forcing exit");
       process.exit(1);
     }, 10000).unref();
   };

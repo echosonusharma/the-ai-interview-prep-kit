@@ -1,9 +1,10 @@
 import type { Request, Response, NextFunction } from "express";
+import { logger } from "../utils/logger.js";
 
 type AppError = Error & { statusCode?: number; status?: number };
 
 export function errorHandler(err: AppError, _req: Request, res: Response, _next: NextFunction) {
-  console.error(err.stack ?? err);
+  logger.error(err.stack ?? err.message ?? String(err));
 
   // Never leak driver/ORM internals to clients — map known shapes to clean codes.
   const name = err.name ?? "";

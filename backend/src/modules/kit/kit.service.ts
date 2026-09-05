@@ -13,6 +13,7 @@ import { validateUrl } from "../../crawler/url-validator.js";
 import { DEFAULT_CONFIG, kitCrawlerConfig, type CrawlerConfig } from "../../crawler/types.js";
 import { kitEvents, type KitEventPayload } from "./kit.events.js";
 import { activeStage, stepToProgress } from "./kit.progress.js";
+import { logger } from "../../utils/logger.js";
 import { serializeKitDetail } from "./kit.serializer.js";
 
 function errorCode(message: string): string {
@@ -449,7 +450,7 @@ export async function recoverStaleRunningJobs() {
     }
   );
   if (stale.modifiedCount > 0) {
-    console.warn(`Re-queued ${stale.modifiedCount} stale running kit job(s)`);
+    logger.warn(`Re-queued ${stale.modifiedCount} stale running kit job(s)`);
   }
 }
 
@@ -524,7 +525,7 @@ export async function runKitGeneration(kit: IKit): Promise<void> {
         publishStatus(kit, null, step === "done" ? "complete" : "progress", detail);
       })
       .catch((err) => {
-        console.warn(`[kit-worker] progress write failed for ${kitId}:`, err);
+        logger.warn(`[kit-worker] progress write failed for ${kitId}:`, err);
       });
     return progressWrites;
   };

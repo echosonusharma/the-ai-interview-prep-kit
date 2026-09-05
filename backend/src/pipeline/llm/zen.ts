@@ -8,6 +8,7 @@ import { withModelGate } from "./gate.js";
 import { env } from "../../config/env.js";
 import { LLM_TOKEN_LIMITS } from "../../config/llm-tokens.js";
 import { logStyle as s } from "../log.js";
+import { logger } from "../../utils/logger.js";
 
 if (typeof globalThis !== "undefined") {
   (globalThis as Record<string, unknown>).AI_SDK_LOG_WARNINGS = false;
@@ -169,7 +170,7 @@ export class ZenClient implements LlmClient {
         throw new Error(`Empty model response. Raw output:\n${emptyResponseDetail(result)}`);
       }
       if (env.LLM_DEBUG_RAW) {
-        console.warn(`${s.label(`[zen/${s.model(model)}]`)} ${s.detail(`raw response (${text.length} chars):`)}\n${s.raw(text.slice(0, 2000))}`);
+        logger.debug(`${s.label(`[zen/${s.model(model)}]`)} ${s.detail(`raw response (${text.length} chars):`)}\n${s.raw(text.slice(0, 2000))}`);
       }
       return { text, model };
     });
@@ -189,7 +190,7 @@ export class ZenClient implements LlmClient {
         throw new Error(`No parseable JSON in model response (prose-only). Raw output:\n${preview}`);
       }
       if (env.LLM_DEBUG_RAW) {
-        console.warn(`${s.label(`[zen/${s.model(model)}]`)} ${s.detail(`raw response (${text.length} chars):`)}\n${s.raw(text.slice(0, 2000))}`);
+        logger.debug(`${s.label(`[zen/${s.model(model)}]`)} ${s.detail(`raw response (${text.length} chars):`)}\n${s.raw(text.slice(0, 2000))}`);
       }
       return { object: schema.parse(salvageJsonOrThrow(text)) as T, model };
     });
