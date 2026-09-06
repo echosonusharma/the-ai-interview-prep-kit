@@ -38,7 +38,9 @@ export function useKitEvents(kitId: string | null, enabled: boolean) {
       const parsed = parseEvent(e);
       if (parsed) setEvent(parsed);
     };
-    const onComplete = () => {
+    const onComplete = (e: MessageEvent) => {
+      const parsed = parseEvent(e);
+      if (parsed) setEvent(parsed);
       setDone(true);
       es.close();
     };

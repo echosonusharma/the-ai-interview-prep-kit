@@ -90,6 +90,31 @@ export const PIPELINE_STAGES = [
   { id: "schedule", label: "Schedule" },
 ] as const;
 
+// Mirrors backend STEP_MAP labels so the panel can render poll data when SSE stalls.
+export const STEP_LABELS: Record<string, string> = {
+  queued: "Queued…",
+  starting: "Starting…",
+  requeued: "Queued…",
+  gate: "Validating input",
+  "gate:done": "Input valid",
+  research: "Researching company site",
+  "research:done": "Research complete",
+  extract: "Extracting role & requirements",
+  "extract:done": "Requirements extracted",
+  questions: "Generating interview questions",
+  "questions:done": "Questions drafted",
+  coverage: "Checking coverage gaps",
+  "coverage:done": "Coverage gaps filled",
+  "flashcards:done": "Flashcards created",
+  schedule: "Building study schedule",
+  done: "Kit ready",
+};
+
+export function stepLabel(step: string | null, status: KitStatus): string {
+  if (step && STEP_LABELS[step]) return STEP_LABELS[step];
+  return status === "queued" ? "Waiting in queue" : "Starting…";
+}
+
 export interface DashboardStats {
   total: number;
   upcoming: number;

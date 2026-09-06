@@ -38,6 +38,7 @@ function kitIdParam(req: Request): string {
 function sseWrite(res: Response, event: string, data: unknown, id?: number) {
   if (id !== undefined) res.write(`id: ${id}\n`);
   res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  (res as Response & { flush?: () => void }).flush?.();
 }
 
 function parseLastEventId(req: Request): number | undefined {
