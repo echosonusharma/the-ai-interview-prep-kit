@@ -4,6 +4,11 @@ Paste a job description + company URL, get a structured interview prep kit: comp
 
 Monorepo: Next.js (TypeScript + Tailwind) frontend, Express (TypeScript) backend.
 
+## Architecture -
+
+![architecture](image.png)
+
+
 ```bash
 .
 ├── frontend/   # Next.js 16 App Router — thin pages delegate to src/features/**
